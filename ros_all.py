@@ -9,6 +9,7 @@ import os
 from collections import Counter
 import random
 import string
+
 import sensor_msgs.msg as msg
 from rclpy.node import Node
 
@@ -94,7 +95,7 @@ class MinimalSubscriber(Node):
 
                 name = "Unknown"
 
-                for num in range(0,3,1):
+                for num in range(0,2,1):
                     face_match = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.5)
                     face_dis = face_recognition.face_distance(self.known_face_encodings, face_encoding)
                     face_best = np.argmin(face_dis)
@@ -113,7 +114,6 @@ class MinimalSubscriber(Node):
                     dbottom = 0
                     dleft = 0
                     if self.previous_have_name and len(self.face_location_record) > 2:
-                        print(self.face_location_record)
                         previous_top = self.face_location_record[-2][0][0]
 
                         previous_right = self.face_location_record[-2][0][1]
@@ -147,6 +147,8 @@ class MinimalSubscriber(Node):
             right *= 4 #x+w
             bottom *= 4 #y+h
             left *= 4 #x
+
+
             namePut = name.split('_')
             if self.unknowTakeAgain and name == self.unknownTakeAgainName and self.unknownTakeAgainCount > 3:
                 i = cv_image[top-50:bottom+50, left-50:right+50]
@@ -159,7 +161,7 @@ class MinimalSubscriber(Node):
             if namePut[0] == 'uahuynhh':
                 width = right - left
                 height = bottom - top
-
+                print(top, height, left, width)
                 dx = left + width/2 - self.CX ## x + w/2 - cx
                 dy = top + height/2 - self.CY ## y + h/2 - cy
                 d = round(self.L0 * m.sqrt(self.S0 / (width * height)))
@@ -167,9 +169,9 @@ class MinimalSubscriber(Node):
                 yalign = False
                 distanceAlign = False
                 # print(dx)
-                if dx > 240:
+                if dx > 114:
                     print("move right...")
-                elif dx < 48:
+                elif dx < -68:
                     print("move left...")
                 else:
                     xalign = True
@@ -187,7 +189,7 @@ class MinimalSubscriber(Node):
                     distanceAlign = True
                 print(dx, dy, d-self.L0)
                 if xalign and yalign and distanceAlign:
-                    cv2.putText(cv_image, "aligned", (left + 20, bottom + 20), font, 1.0, (255, 255, 255), 1)
+                    cv2.putText(cv_image, "aligned", (left + 20, bottom + 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
 
                 # Draw a box around the face
             cv2.rectangle(cv_image, (left, top), (right, bottom), (0, 0, 255), 2)
@@ -196,10 +198,10 @@ class MinimalSubscriber(Node):
                 # Draw a label with a name below the face
             cv2.rectangle(cv_image, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
             font = cv2.FONT_HERSHEY_DUPLEX
-            cv2.putText(cv_image, namePut[0], (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+            cv2.putText(cv_image, namePut[0], (left + 6, bottom - 6), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
 
-            transback = self.bridge.cv2_to_imgmsg(cv_image, "bgr8")
-            self.publisher_.publish(transback)
+        transback = self.bridge.cv2_to_imgmsg(cv_image, "bgr8")
+        self.publisher_.publish(transback)
     def randomString(self, stringLength=8):
         letters = string.ascii_lowercase
         return ''.join(random.choice(letters) for i in range(stringLength))
