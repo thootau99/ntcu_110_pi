@@ -39,10 +39,9 @@ class MinimalSubscriber(Node):
         self.telloCli = self.create_client(TelloAction, 'tello_action') #TODO: 待完成，call ros2 service
         while not self.telloCli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
-        
+        self.telloCliRequest = TelloAction.Request()
         if self.telloCli.wait_for_service:
             self.sendRequest("rc 0 0 0 123")
-        self.telloCliRequest = TelloAction.Request()
         self.bridge = CvBridge() # CvBridge Init
         self.process_this_frame = True # ! 用來一次只處理一個 frame 的 variable
         self.names = []  # read_file 存名字 
