@@ -201,6 +201,7 @@ while True:
             xalign = False
             yalign = False
             distanceAlign = False
+            print(d-L0)
             # print(dx)
             if dx > 240:
                 print("move right...")

@@ -218,6 +218,8 @@ class MinimalSubscriber(Node):
 
                 elif (d-self.L0) < -15:
                     self.send_request('rc 0 0 -20 0')
+                elif (d-self.L0) < -50:
+                    self.send_request('emergency')
                 else:
                     distanceAlign = True
                 print(dx, dy, d-self.L0)
