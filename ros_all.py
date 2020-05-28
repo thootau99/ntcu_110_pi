@@ -1,6 +1,4 @@
-import face_recognition
 import cv2
-from cv_bridge import CvBridge
 import rclpy
 import numpy as np
 import json
@@ -9,10 +7,12 @@ import os
 from collections import Counter
 import random
 import string
+import face_recognition
 
 import sensor_msgs.msg as msg
 from rclpy.node import Node
 
+from cv_bridge import CvBridge
 
 
 
@@ -26,44 +26,45 @@ from rclpy.node import Node
 class MinimalSubscriber(Node):
 
     def __init__(self):
-        super().__init__('minimal_subscriber')
+        super().__init__('minimal_subscriber') # 初始化為 ROS-Node
         self.subscription = self.create_subscription(
             msg.Image,
             'image',
             self.listener_callback,
             10)
-        self.publisher_ = self.create_publisher(msg.Image, 'cvImage', 10)
+            # 加入 ROS-subscrciber, 訂閱 "image" 取得影像
+        self.publisher_ = self.create_publisher(msg.Image, 'cvImage', 10) # 加入 ROS-publisher, 發出處理過的image
         self.subscription  # prevent unused variable warning
-        self.bridge = CvBridge()
-        self.process_this_frame = True
-        self.names = []
-        self.labels = []
-        self.L0 = 120
-        self.S0 = 25600
-        self.CX = 480
-        self.CY = 360
-        self.face_locations = []
-        self.face_encodings = []
-        self.face_names = []
-        self.face_location_record = []
-        self.face_name_record = []
+        self.bridge = CvBridge() # CvBridge Init
+        self.process_this_frame = True # ! 用來一次只處理一個 frame 的 variable
+        self.names = []  # read_file 存名字 
+        self.labels = [] # read_file 存路徑
 
-        self.previous_have_name = False
-        self.process_this_frame = True
 
-        self.unknownChup = 0
-        self.isUnknown = 0
-        self.unknowTakeAgain = False
+        self.L0 = 120   # 人與camera的距離
+        self.S0 = 25600 # 預計的人臉框大小
+        self.CX = 480   # 大約在畫面中間的 X 座標
+        self.CY = 360   # 大約在畫面中間的 Y 座標
+    
+        self.face_locations = [] # 存解析輸入圖片後人臉的位置
+        self.face_encodings = [] # 存解析輸入圖片後人臉的 code
+        self.face_names = []     # 存解析輸入圖片後人臉的 name
+
+        self.face_location_record = [] # 記錄上次的人臉位置
+        self.face_name_record = [] # 記錄上次的人臉名
+        self.previous_have_name = False # 記錄上一次有沒有人名
+        self.unknowTakeAgain = False # 
         self.unknownTakeAgainName = ''
         self.unknownTakeAgainCount = 0
-        self.Distance = 100
-        self.known_face_encodings = []
-        self.known_face_names = []
 
-        self.read_path('./dataset_img')
+        self.known_face_encodings = [] # 存解析 database 中的人臉
+        self.known_face_names = [] # 存解析 database 中的人名
+
+        self.dark = False # 看圖有沒有過黑
+        self.read_path('./dataset_img') # 到 /dataset_img 讀資料
 
         l = locals()
-        for item in self.names:
+        for item in self.names: # ! 讀取在 dataset_img 下的全部圖片
             l['%s_image'%item] = face_recognition.load_image_file("dataset_img/%s.jpg"%item)
             if len(face_recognition.face_encodings(l['%s_image'%item])) != 0:
                 l['%s_face_encoding'%item] = face_recognition.face_encodings(l['%s_image'%item])[0]
@@ -73,41 +74,63 @@ class MinimalSubscriber(Node):
                 os.remove("./dataset_img/%s.jpg"%item)
                 print("removed dataset_img/%s.jpg"%item)
 
-    def listener_callback(self, image):
+    def listener_callback(self, image): #! 從image讀到cam image後觸發的 function
         try:
-            cv_image = self.bridge.imgmsg_to_cv2(image, "bgr8")
+            cv_image = self.bridge.imgmsg_to_cv2(image, "bgr8") # 轉換
         except CvBridgeError as e:
             print(e)
-        small_frame = cv2.resize(cv_image, (0, 0), fx=0.25, fy=0.25)
-        rgb_small_frame = small_frame[:, :, ::-1]
+        small_frame = cv2.resize(cv_image, (0, 0), fx=0.25, fy=0.25) # resize frame
+
+        gray_img = cv2.cvtColor(small_frame,cv2.COLOR_BGR2GRAY); # 轉灰階來辨別圖片有沒有過黑
+        r,c = gray_img.shape[:2] 
+        darkSum = 0
+        darkProp = 0
+        pixelSum = r*c
+
+        for row in gray_img:
+            for col in row:
+                if col < 40:
+                    darkSum += 1
+        darkProp = darkSum / pixelSum
+        if darkProp >= 0.75:
+            rgb_small_frame = self.log(42, cv_image) # 若太黑就加亮
+            rgb_small_frame = rgb_small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
+        else:
+            rgb_small_frame = small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
         if self.process_this_frame:
-            self.face_locations = face_recognition.face_locations(rgb_small_frame)
+
+            if self.dark:
+                self.face_locations = face_recognition.face_locations(rgb_small_frame, number_of_times_to_upsample=3)
+                # 若太黑就多掃描2次
+                
+            else:
+                self.face_locations = face_recognition.face_locations(rgb_small_frame) # 掃描在圖片中的臉一次
 
             self.face_encodings = face_recognition.face_encodings(rgb_small_frame, self.face_locations)
+            # 解析在畫面中的臉
             self.face_names = []
             if self.face_locations != '' and len(self.face_locations) != 0:
                 self.face_location_record.append(self.face_locations)
             for face_encoding in self.face_encodings:
-                matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.5)
-
-
+                matches = []
                 matchesNamesCheckAgain = []
 
                 name = "Unknown"
-
                 for num in range(0,2,1):
-                    face_match = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.5)
+                    if self.dark == True:
+                        matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.8)
+                    else:
+                        matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.5)
                     face_dis = face_recognition.face_distance(self.known_face_encodings, face_encoding)
                     face_best = np.argmin(face_dis)
                     matchesNamesCheckAgain.append(face_best)
-
+                self.dark = False
                 result = Counter(matchesNamesCheckAgain)
                 most_common = result.most_common()
                 if matches[most_common[0][0]]:
                     name = self.known_face_names[most_common[0][0]]
                     self.face_name_record.append(most_common[0][0])
                     self.previous_have_name = True
-
                 if name == "Unknown" :
                     dtop = 0
                     dright = 0
@@ -222,6 +245,12 @@ class MinimalSubscriber(Node):
             print(full_path)
 
         return self.names, self.labels
+    def log(self, c, img):
+        output = c * np.log(1.0+img)
+        output = np.uint8(output+0.5)
+        output = cv2.GaussianBlur(output, (3, 3), 0)
+        self.dark = True
+        return output
 def main(args=None):
     rclpy.init(args=args)
 
