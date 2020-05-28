@@ -29,12 +29,14 @@ class MinimalSubscriber(Node):
         super().__init__('minimal_subscriber') # 初始化為 ROS-Node
         self.subscription = self.create_subscription(
             msg.Image,
-            'image',
+            'tello_ros/image_raw',
             self.listener_callback,
             10)
             # 加入 ROS-subscrciber, 訂閱 "image" 取得影像
         self.publisher_ = self.create_publisher(msg.Image, 'cvImage', 10) # 加入 ROS-publisher, 發出處理過的image
         self.subscription  # prevent unused variable warning
+        self.telloCli = self.create_client(command_callback) #TODO: 待完成，call ros2 service
+
         self.bridge = CvBridge() # CvBridge Init
         self.process_this_frame = True # ! 用來一次只處理一個 frame 的 variable
         self.names = []  # read_file 存名字 
@@ -192,23 +194,23 @@ class MinimalSubscriber(Node):
                 yalign = False
                 distanceAlign = False
                 #TODO:寫入飛行指令
-                # print(dx)
                 if dx > 114:
-                    print("move right...")
+                    self.telloCli.send("{cmd: 'rc 20 0 0 0'}")
                 elif dx < -68:
-                    print("move left...")
+                    self.telloCli.send("{cmd: 'rc -20 0 0 0'}")
                 else:
                     xalign = True
                 if dy > 50:
-                    print("move down...")
+                    self.telloCli.send("{cmd: 'rc 0 -20 0 0'}")
                 elif dy < -50:
-                    print("move up")
+                    self.telloCli.send("{cmd: 'rc 0 20 0 0'}")
                 else:
                     yalign = True
                 if (d-self.L0) > 15:
-                    print("move front...")
+                    self.telloCli.send("{cmd: 'rc 0 0 20 0'}")
+
                 elif (d-self.L0) < -15:
-                    print("move back")
+                    self.telloCli.send("{cmd: 'rc 0 0 -20 0'}")
                 else:
                     distanceAlign = True
                 print(dx, dy, d-self.L0)
