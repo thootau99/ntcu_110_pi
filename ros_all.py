@@ -40,7 +40,7 @@ class MinimalSubscriber(Node):
         while not self.telloCli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
         
-        if self.telloCliRequest.wait_for_service:
+        if self.telloCli.wait_for_service:
             self.sendRequest("rc 0 0 0 123")
         self.telloCliRequest = TelloAction.Request()
         self.bridge = CvBridge() # CvBridge Init
