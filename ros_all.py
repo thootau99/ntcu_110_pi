@@ -36,8 +36,11 @@ class MinimalSubscriber(Node):
             # 加入 ROS-subscrciber, 訂閱 "image" 取得影像
         self.publisher_ = self.create_publisher(msg.Image, 'cvImage', 10) # 加入 ROS-publisher, 發出處理過的image
         self.subscription  # prevent unused variable warning
-        self.telloCli = self.create_client(command_callback) #TODO: 待完成，call ros2 service
-
+        self.telloCli = self.create_client(TelloAction, 'tello_action') #TODO: 待完成，call ros2 service
+        while not self.cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('service not available, waiting again...')
+        self.telloCliRequest = TelloAction.Request()
+        
         self.bridge = CvBridge() # CvBridge Init
         self.process_this_frame = True # ! 用來一次只處理一個 frame 的 variable
         self.names = []  # read_file 存名字 
@@ -76,7 +79,9 @@ class MinimalSubscriber(Node):
             else:
                 os.remove("./dataset_img/%s.jpg"%item)
                 print("removed dataset_img/%s.jpg"%item)
-
+    def sendRequest(self, s):
+        self.telloCliRequest.cmd = s
+        self.future = self.telloCli.call_async(self.telloCliRequest)
     def listener_callback(self, image): #! 從image讀到cam image後觸發的 function
         try:
             cv_image = self.bridge.imgmsg_to_cv2(image, "bgr8") # 轉換
@@ -196,22 +201,22 @@ class MinimalSubscriber(Node):
                 distanceAlign = False
                 #TODO:寫入飛行指令
                 if dx > 114:
-                    self.telloCli.send("{cmd: 'rc 20 0 0 0'}")
+                    self.send_request('rc 20 0 0 0')
                 elif dx < -68:
-                    self.telloCli.send("{cmd: 'rc -20 0 0 0'}")
+                    self.send_request('rc -20 0 0 0')
                 else:
                     xalign = True
                 if dy > 50:
-                    self.telloCli.send("{cmd: 'rc 0 -20 0 0'}")
+                    self.send_request('rc 0 -20 0 0')
                 elif dy < -50:
-                    self.telloCli.send("{cmd: 'rc 0 20 0 0'}")
+                    self.send_request('rc 0 20 0 0')
                 else:
                     yalign = True
                 if (d-self.L0) > 15:
-                    self.telloCli.send("{cmd: 'rc 0 0 20 0'}")
+                    self.send_request('rc 0 0 20 0')
 
                 elif (d-self.L0) < -15:
-                    self.telloCli.send("{cmd: 'rc 0 0 -20 0'}")
+                    self.send_request('rc 0 0 -20 0')
                 else:
                     distanceAlign = True
                 print(dx, dy, d-self.L0)
