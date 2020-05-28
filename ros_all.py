@@ -37,7 +37,7 @@ class MinimalSubscriber(Node):
         self.publisher_ = self.create_publisher(msg.Image, 'cvImage', 10) # 加入 ROS-publisher, 發出處理過的image
         self.subscription  # prevent unused variable warning
         self.telloCli = self.create_client(TelloAction, 'tello_action') #TODO: 待完成，call ros2 service
-        while not self.cli.wait_for_service(timeout_sec=1.0):
+        while not self.telloCli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
         self.telloCliRequest = TelloAction.Request()
         
