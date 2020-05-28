@@ -191,6 +191,7 @@ class MinimalSubscriber(Node):
                 xalign = False
                 yalign = False
                 distanceAlign = False
+                #TODO:寫入飛行指令
                 # print(dx)
                 if dx > 114:
                     print("move right...")
