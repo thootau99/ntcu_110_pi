@@ -208,16 +208,16 @@ class MinimalSubscriber(Node):
                 else:
                     xalign = True
                 if dy > 50:
-                    self.send_request('rc 0 -20 0 0')
+                    self.send_request('rc 0 0 -20 0')
                 elif dy < -50:
-                    self.send_request('rc 0 20 0 0')
+                    self.send_request('rc 0 0 20 0')
                 else:
                     yalign = True
                 if (d-self.L0) > 15:
-                    self.send_request('rc 0 0 20 0')
+                    self.send_request('rc 0 20 0 0')
 
                 elif (d-self.L0) < -15:
-                    self.send_request('rc 0 0 -20 0')
+                    self.send_request('rc 0 -20 0 0')
                 elif (d-self.L0) < -50:
                     self.send_request('emergency')
                 else:
