@@ -206,12 +206,14 @@ class MinimalSubscriber(Node):
                 elif dx < -68:
                     self.send_request('rc -20 0 0 0')
                 else:
+                    self.send_request('rc 0 0 0 0')
                     xalign = True
                 if dy > 50:
                     self.send_request('rc 0 0 -20 0')
                 elif dy < -50:
                     self.send_request('rc 0 0 20 0')
                 else:
+                    self.send_request('rc 0 0 0 0')
                     yalign = True
                 if (d-self.L0) > 15:
                     self.send_request('rc 0 20 0 0')
@@ -221,6 +223,7 @@ class MinimalSubscriber(Node):
                 elif (d-self.L0) < -50:
                     self.send_request('emergency')
                 else:
+                    self.send_request('rc 0 0 0 0')
                     distanceAlign = True
                 print(dx, dy, d-self.L0)
                 if xalign and yalign and distanceAlign:
