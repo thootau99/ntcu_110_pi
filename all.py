@@ -182,7 +182,7 @@ while True:
         bottom *= 4 #y+h
         left *= 4 #x
         namePut = name.split('_')
-
+        print(video_capture.get(3), video_capture(4))
         if unknowTakeAgain and name == unknownTakeAgainName and unknownTakeAgainCount > 3:
 
             i = frame[top-50:bottom+50, left-50:right+50]
