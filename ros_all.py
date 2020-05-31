@@ -257,7 +257,7 @@ class MinimalSubscriber(Node):
                     d = dir_item.split('.')
                     self.names.append(d[0])
                     self.labels.append(full_path)
-            print(full_path)
+                    print(full_path)
 
         return self.names, self.labels
     def log(self, c, img):
@@ -266,6 +266,7 @@ class MinimalSubscriber(Node):
         output = cv2.GaussianBlur(output, (3, 3), 0)
         self.dark = True
         return output
+
 def main(args=None):
     rclpy.init(args=args)
 
