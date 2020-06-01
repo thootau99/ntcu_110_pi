@@ -41,12 +41,12 @@ class MinimalSubscriber(Node):
             self.get_logger().info('service not available, waiting again...')
         self.telloCliRequest = TelloAction.Request()
         if self.telloCli.wait_for_service:
-            self.sendRequest("rc 0 0 0 123")
+            self.sendRequest("rc 0 0 0 0")
         self.bridge = CvBridge() # CvBridge Init
         self.process_this_frame = True # ! 用來一次只處理一個 frame 的 variable
         self.names = []  # read_file 存名字 
         self.labels = [] # read_file 存路徑
-
+        self.noFaceCount = 0
 
         self.L0 = 120   # 人與camera的距離
         self.S0 = 25600 # 預計的人臉框大小
@@ -120,6 +120,7 @@ class MinimalSubscriber(Node):
             self.face_names = []
             if self.face_locations != '' and len(self.face_locations) != 0:
                 self.face_location_record.append(self.face_locations)
+            
             for face_encoding in self.face_encodings:
                 matches = []
                 matchesNamesCheckAgain = []
@@ -170,10 +171,16 @@ class MinimalSubscriber(Node):
                         self.unknownTakeAgainName = name
                 self.face_names.append(name)
         if len(self.face_location_record) > 5:
-                self.face_location_record = []
+            self.face_location_record = []
         if len(self.face_name_record) > 5:
-                self.face_name_record = []
+            self.face_name_record = []
         self.process_this_frame = not self.process_this_frame
+        if self.face_names == [] :
+            self.noFaceCount += 1
+            if self.noFaceCount > 20:
+                self.sendRequest('rc 0 0 0 10')
+        else:
+            self.noFaceCount = 0
         for (top, right, bottom, left), name in zip(self.face_locations, self.face_names):
             top *= 4 #y
             right *= 4 #x+w

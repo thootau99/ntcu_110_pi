@@ -170,6 +170,8 @@ while True:
         face_location_record = []
     if len(face_name_record) > 5:
         face_name_record = []
+    if face_names == [] :
+        print("noface!")
     process_this_frame = not process_this_frame
 
     #150-200 450-500 328 340 100cm, center
@@ -182,7 +184,6 @@ while True:
         bottom *= 4 #y+h
         left *= 4 #x
         namePut = name.split('_')
-        print(video_capture.get(3), video_capture(4))
         if unknowTakeAgain and name == unknownTakeAgainName and unknownTakeAgainCount > 3:
 
             i = frame[top-50:bottom+50, left-50:right+50]
