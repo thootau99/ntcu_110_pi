@@ -91,6 +91,7 @@ class MinimalSubscriber(Node):
         small_frame = cv2.resize(cv_image, (0, 0), fx=0.25, fy=0.25) # resize frame
 
         gray_img = cv2.cvtColor(small_frame,cv2.COLOR_BGR2GRAY); # 轉灰階來辨別圖片有沒有過黑
+        
         r,c = gray_img.shape[:2] 
         darkSum = 0
         darkProp = 0
@@ -106,6 +107,8 @@ class MinimalSubscriber(Node):
             rgb_small_frame = rgb_small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
         else:
             rgb_small_frame = small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
+
+
         if self.process_this_frame:
 
             if self.dark:
@@ -128,7 +131,7 @@ class MinimalSubscriber(Node):
                 name = "Unknown"
                 for num in range(0,2,1):
                     if self.dark == True:
-                        matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.8)
+                        matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.9)
                     else:
                         matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.5)
                     face_dis = face_recognition.face_distance(self.known_face_encodings, face_encoding)
@@ -232,6 +235,7 @@ class MinimalSubscriber(Node):
                 else:
                     self.send_request('rc 0 0 0 0')
                     distanceAlign = True
+
                 print(dx, dy, d-self.L0)
                 if xalign and yalign and distanceAlign:
                     cv2.putText(cv_image, "aligned", (left + 20, bottom + 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)

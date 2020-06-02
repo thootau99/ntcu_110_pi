@@ -26,6 +26,13 @@ S0 = 25600
 CX = 480
 CY = 360
 
+def log(c, img):
+    output = c * np.log(1.0+img)
+    output = np.uint8(output+0.5)
+
+    output = cv2.GaussianBlur(output, (3, 3), 0)
+    return output
+
 def randomString(stringLength=8):
     letters = string.ascii_lowercase
     return ''.join(random.choice(letters) for i in range(stringLength))
@@ -82,6 +89,8 @@ unknowTakeAgain = False
 unknownTakeAgainName = ''
 unknownTakeAgainCount = 0
 Distance = 100
+dark = False
+
 
 while True:
     # Grab a single frame of video
@@ -90,21 +99,49 @@ while True:
     # 將影片大小降為1/4, 好做辨識
     small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
 
+    gray_img = cv2.cvtColor(small_frame,cv2.COLOR_BGR2GRAY);
+
+    r,c = gray_img.shape[:2]
+    darkSum = 0
+    darkProp = 0
+    pixelSum = r*c
+
+    for row in gray_img:
+        for col in row:
+            if col < 40:
+                darkSum += 1
+    darkProp = darkSum / pixelSum
+    print(darkProp)
+    if darkProp >= 0.5:
+        print("Pic is dark!")
+        rgb_small_frame = log(42, small_frame)
+        cv2.imshow("window", rgb_small_frame)
+        dark = True
+        rgb_small_frame = rgb_small_frame[:, :, ::-1]
+
+    else:
+        rgb_small_frame = small_frame[:, :, ::-1]
     # OpenCV-> BGR, face_recognition -> RGB (轉換)
     rgb_small_frame = small_frame[:, :, ::-1]
 
     # Only process every other frame of video to save time
     if process_this_frame:
         # Find all the faces and face encodings in the current frame of video
-        face_locations = face_recognition.face_locations(rgb_small_frame)
-
+        if dark:
+            face_locations = face_recognition.face_locations(rgb_small_frame, number_of_times_to_upsample=3)
+                # 若太黑就多掃描2次
+        else:
+            face_locations = face_recognition.face_locations(rgb_small_frame) # 掃描在圖片中的臉一次
+        
+        dark = False
+        
         face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
         face_names = []
         if face_locations != '' and len(face_locations) != 0:
             face_location_record.append(face_locations)
         for face_encoding in face_encodings:
             # See if the face is a match for the known face(s)
-            matches = face_recognition.compare_faces(known_face_encodings, face_encoding, tolerance=0.5)
+            matches = face_recognition.compare_faces(known_face_encodings, face_encoding, tolerance=0.9)
 
             matchesNamesCheckAgain = []
 
@@ -170,8 +207,6 @@ while True:
         face_location_record = []
     if len(face_name_record) > 5:
         face_name_record = []
-    if face_names == [] :
-        print("noface!")
     process_this_frame = not process_this_frame
 
     #150-200 450-500 328 340 100cm, center
@@ -184,6 +219,7 @@ while True:
         bottom *= 4 #y+h
         left *= 4 #x
         namePut = name.split('_')
+
         if unknowTakeAgain and name == unknownTakeAgainName and unknownTakeAgainCount > 3:
 
             i = frame[top-50:bottom+50, left-50:right+50]
@@ -202,7 +238,6 @@ while True:
             xalign = False
             yalign = False
             distanceAlign = False
-            print(d-L0)
             # print(dx)
             if dx > 240:
                 print("move right...")
