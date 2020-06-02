@@ -211,32 +211,36 @@ class MinimalSubscriber(Node):
                 yalign = False
                 distanceAlign = False
                 #TODO: 改用組字串ㄉ寫
+                
+                execute = ['rc', '0', '0', '0', '0']
+                
                 if dx > 114:
-                    self.send_request('rc 20 0 0 0')
+                    execute[1] = '20'
                 elif dx < -68:
-                    self.send_request('rc -20 0 0 0')
+                    execute[1] = '-20'
                 else:
-                    self.send_request('rc 0 0 0 0')
+                    execute[1] = '0'
                     xalign = True
                 if dy > 50:
-                    self.send_request('rc 0 0 -20 0')
+                    execute[3] = '-20'
                 elif dy < -50:
-                    self.send_request('rc 0 0 20 0')
+                    execute[3] = '20'
                 else:
-                    self.send_request('rc 0 0 0 0')
+                    execute[3] = '0'
                     yalign = True
                 if (d-self.L0) > 15:
-                    self.send_request('rc 0 20 0 0')
+                    execute[2] = '20'
 
                 elif (d-self.L0) < -15:
-                    self.send_request('rc 0 -20 0 0')
+                    execute[2] = '-20'
                 elif (d-self.L0) < -50:
                     self.send_request('emergency')
                 else:
-                    self.send_request('rc 0 0 0 0')
+                    execute[2] = '0'
                     distanceAlign = True
-
-                print(dx, dy, d-self.L0)
+                executeString = ' '.join(execute)
+                
+                self.send_request(executeString)
                 if xalign and yalign and distanceAlign:
                     cv2.putText(cv_image, "aligned", (left + 20, bottom + 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
 
