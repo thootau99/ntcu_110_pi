@@ -210,7 +210,7 @@ class MinimalSubscriber(Node):
                 xalign = False
                 yalign = False
                 distanceAlign = False
-                #TODO: 測試飛行效果
+                #TODO: 改用組字串ㄉ寫
                 if dx > 114:
                     self.send_request('rc 20 0 0 0')
                 elif dx < -68:
