@@ -199,7 +199,7 @@ class MinimalSubscriber(Node):
                 self.unknowTakeAgain = False
                 self.unknownTakeAgainName = ''
                 self.unknownTakeAgainCount = 0
-
+            execute = ['rc', '0', '0', '0', '0']
             if namePut[0] == 'uahuynhh':
                 width = right - left
                 height = bottom - top
@@ -212,7 +212,6 @@ class MinimalSubscriber(Node):
                 distanceAlign = False
                 #TODO: 改用組字串ㄉ寫
                 
-                execute = ['rc', '0', '0', '0', '0']
                 
                 if dx > 114:
                     execute[1] = '20'
@@ -241,14 +240,14 @@ class MinimalSubscriber(Node):
                 else:
                     execute[2] = '0'
                     distanceAlign = True
-                executeString = ' '.join(execute)
                 
-                self.send_request(executeString)
                 if xalign and yalign and distanceAlign:
                     cv2.putText(cv_image, "aligned", (left + 20, bottom + 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
 
                 # Draw a box around the face
             cv2.rectangle(cv_image, (left, top), (right, bottom), (0, 0, 255), 2)
+            executeString = ' '.join(execute)
+            self.send_request(executeString)
 
 
                 # Draw a label with a name below the face
