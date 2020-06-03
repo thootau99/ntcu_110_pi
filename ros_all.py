@@ -30,7 +30,7 @@ class MinimalSubscriber(Node):
         super().__init__('minimal_subscriber') # 初始化為 ROS-Node
         self.subscription = self.create_subscription(
             msg.Image,
-            'tello_ros/image_raw',
+            'image_raw',
             self.listener_callback,
             10)
             # 加入 ROS-subscrciber, 訂閱 "image" 取得影像
@@ -52,7 +52,7 @@ class MinimalSubscriber(Node):
         self.S0 = 25600 # 預計的人臉框大小
         self.CX = 480   # 大約在畫面中間的 X 座標
         self.CY = 360   # 大約在畫面中間的 Y 座標
-    
+        self.xulyframe = 0
         self.face_locations = [] # 存解析輸入圖片後人臉的位置
         self.face_encodings = [] # 存解析輸入圖片後人臉的 code
         self.face_names = []     # 存解析輸入圖片後人臉的 name
@@ -90,23 +90,25 @@ class MinimalSubscriber(Node):
             print(e)
         small_frame = cv2.resize(cv_image, (0, 0), fx=0.25, fy=0.25) # resize frame
 
-        gray_img = cv2.cvtColor(small_frame,cv2.COLOR_BGR2GRAY); # 轉灰階來辨別圖片有沒有過黑
+        # gray_img = cv2.cvtColor(small_frame,cv2.COLOR_BGR2GRAY); # 轉灰階來辨別圖片有沒有過黑
         
-        r,c = gray_img.shape[:2] 
-        darkSum = 0
-        darkProp = 0
-        pixelSum = r*c
+        # r,c = gray_img.shape[:2] 
+        # darkSum = 0
+        # darkProp = 0
+        # pixelSum = r*c
 
-        for row in gray_img:
-            for col in row:
-                if col < 40:
-                    darkSum += 1
-        darkProp = darkSum / pixelSum
-        if darkProp >= 0.75:
-            rgb_small_frame = self.log(42, cv_image) # 若太黑就加亮
-            rgb_small_frame = rgb_small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
-        else:
-            rgb_small_frame = small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
+        # for row in gray_img:
+        #     for col in row:
+        #         if col < 40:
+        #             darkSum += 1
+        # darkProp = darkSum / pixelSum
+        # if darkProp >= 0.75:
+        #     rgb_small_frame = self.log(42, cv_image) # 若太黑就加亮
+        #     rgb_small_frame = rgb_small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
+        # else:
+        #     rgb_small_frame = small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
+        
+        rgb_small_frame = small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
 
 
         if self.process_this_frame:
@@ -129,7 +131,7 @@ class MinimalSubscriber(Node):
                 matchesNamesCheckAgain = []
 
                 name = "Unknown"
-                for num in range(0,2,1):
+                for num in range(0,1,1):
                     if self.dark == True:
                         matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.9)
                     else:
@@ -212,42 +214,46 @@ class MinimalSubscriber(Node):
                 distanceAlign = False
                 #TODO: 改用組字串ㄉ寫
                 
-                
-                if dx > 114:
-                    execute[1] = '20'
-                elif dx < -68:
-                    execute[1] = '-20'
-                else:
-                    execute[1] = '0'
-                    xalign = True
-                if dy > 50:
-                    execute[3] = '-20'
-                elif dy < -50:
-                    execute[3] = '20'
-                else:
-                    execute[3] = '0'
-                    yalign = True
-                if (d-self.L0) > 15:
-                    execute[2] = '20'
+                if self.xulyframe >= 2:
+                    if dx > 130:
+                        execute[1] = '10'
+                    elif dx < -104:
+                        execute[1] = '-10'
+                    else:
+                        execute[1] = '0'
+                        xalign = True
+                    if dy > 80:
+                        execute[3] = '-10'
+                    elif dy < -80:
+                        execute[3] = '10'
+                    else:
+                        execute[3] = '0'
+                        yalign = True
+                    if (d-self.L0) > 15:
+                        execute[2] = '10'
 
-                elif (d-self.L0) < -15:
-                    execute[2] = '-20'
-                elif (d-self.L0) < -50:
-                    self.send_request('emergency')
-                    self.destroy_node()
-                    rclpy.shutdown()
-                    exit()
-                else:
-                    execute[2] = '0'
-                    distanceAlign = True
-                
-                if xalign and yalign and distanceAlign:
-                    cv2.putText(cv_image, "aligned", (left + 20, bottom + 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
+                    elif (d-self.L0) < -15:
+                        execute[2] = '-10'
+                    elif (d-self.L0) < -50:
+                        self.send_request('emergency')
+                        self.destroy_node()
+                        rclpy.shutdown()
+                        exit()
+                    else:
+                        execute[2] = '0'
+                        distanceAlign = True
+                    
+                    if xalign and yalign and distanceAlign:
+                        cv2.putText(cv_image, "aligned", (left + 20, bottom + 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
 
+                    executeString = ' '.join(execute)
+                    self.sendRequest(executeString)
+                    self.xulyframe = 0
+                self.xulyframe += 1
+                print(self.xulyframe)
                 # Draw a box around the face
             cv2.rectangle(cv_image, (left, top), (right, bottom), (0, 0, 255), 2)
-            executeString = ' '.join(execute)
-            self.send_request(executeString)
+            
 
 
                 # Draw a label with a name below the face
