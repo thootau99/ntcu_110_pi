@@ -235,6 +235,9 @@ class MinimalSubscriber(Node):
                     execute[2] = '-20'
                 elif (d-self.L0) < -50:
                     self.send_request('emergency')
+                    self.destroy_node()
+                    rclpy.shutdown()
+                    exit()
                 else:
                     execute[2] = '0'
                     distanceAlign = True
