@@ -8,10 +8,11 @@ from collections import Counter
 import random
 import string
 import face_recognition
+import datetime
 
 import sensor_msgs.msg as msg
 from rclpy.node import Node
-
+from threading import Thread
 from tello_msgs.srv import TelloAction
 from cv_bridge import CvBridge
 
@@ -22,8 +23,30 @@ from cv_bridge import CvBridge
 
 # Create arrays of known face encodings and their names
 
+class WebCamVideoStream:
+    def __init__(self, src=0):
+        self.stream = cv2.VideoCapture(src)
+        (self.grabbed, self.frame) = self.stream.read()
 
+        self.stopped = False
 
+    def start(self):
+        Thread(target=self.update, args=()).start()
+        return self
+    
+    def update(self):
+        while True:
+            if self.stopped:
+                return
+                
+            (self.grabbed, self.frame) = self.stream.read()
+
+    def read(self):
+        return self.frame
+
+    def stop(self):
+        self.stopped = True
+    
 class MinimalSubscriber(Node):
 
     def __init__(self):
@@ -151,7 +174,6 @@ class MinimalSubscriber(Node):
                     if name.split('_')[0] == 'uahuynhh':
                         if self.noRepeatName:
                             name = "Unknown"
-                            print(name)
 
                         self.noRepeatName = True
 
@@ -216,7 +238,6 @@ class MinimalSubscriber(Node):
             if namePut[0] == 'uahuynhh':
                 width = right - left
                 height = bottom - top
-                print(top, height, left, width)
                 dx = left + width/2 - self.CX ## x + w/2 - cx
                 dy = top + height/2 - self.CY ## y + h/2 - cy
                 d = round(self.L0 * m.sqrt(self.S0 / (width * height)))
@@ -225,11 +246,11 @@ class MinimalSubscriber(Node):
                 distanceAlign = False
                 #TODO: 改用組字串ㄉ寫
                 
-                if self.xulyframe >= 2:
+                if self.xulyframe >= 1:
                     if dx > 130:
-                        execute[4] = '10'
+                        execute[4] = '13'
                     elif dx < -84:
-                        execute[4] = '-10'
+                        execute[4] = '-13'
                     else:
                         execute[4] = '0'
                         xalign = True
@@ -253,7 +274,6 @@ class MinimalSubscriber(Node):
                     else:
                         execute[2] = '0'
                         distanceAlign = True
-                    print(dx, dy, d-self.L0)
                     if xalign and yalign and distanceAlign:
                         cv2.putText(cv_image, "aligned", (left + 20, bottom + 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
 
@@ -273,6 +293,7 @@ class MinimalSubscriber(Node):
 
         transback = self.bridge.cv2_to_imgmsg(cv_image, "bgr8")
         self.publisher_.publish(transback)
+    
     def randomString(self, stringLength=8):
         letters = string.ascii_lowercase
         return ''.join(random.choice(letters) for i in range(stringLength))
