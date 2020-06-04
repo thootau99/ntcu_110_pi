@@ -48,6 +48,9 @@ class MinimalSubscriber(Node):
         self.labels = [] # read_file 存路徑
         self.noFaceCount = 0
 
+        self.noRepeatName = False
+        self.noRepeatNameRecord = []
+
         self.L0 = 120   # 人與camera的距離
         self.S0 = 25600 # 預計的人臉框大小
         self.CX = 480   # 大約在畫面中間的 X 座標
@@ -88,7 +91,7 @@ class MinimalSubscriber(Node):
             cv_image = self.bridge.imgmsg_to_cv2(image, "bgr8") # 轉換
         except CvBridgeError as e:
             print(e)
-        small_frame = cv2.resize(cv_image, (0, 0), fx=0.25, fy=0.25) # resize frame
+        small_frame = cv2.resize(cv_image, (0, 0), fx=0.5, fy=0.5) # resize frame
 
         # gray_img = cv2.cvtColor(small_frame,cv2.COLOR_BGR2GRAY); # 轉灰階來辨別圖片有沒有過黑
         
@@ -145,8 +148,15 @@ class MinimalSubscriber(Node):
                 if matches[most_common[0][0]]:
                     name = self.known_face_names[most_common[0][0]]
                     self.face_name_record.append(most_common[0][0])
+                    if name.split('_')[0] == 'uahuynhh':
+                        if self.noRepeatName:
+                            name = "Unknown"
+                            print(name)
+
+                        self.noRepeatName = True
+
                     self.previous_have_name = True
-                if name == "Unknown" :
+                if name == "Unknown" and not self.noRepeatName:
                     dtop = 0
                     dright = 0
                     dbottom = 0
@@ -186,11 +196,12 @@ class MinimalSubscriber(Node):
                 self.sendRequest('rc 0 0 0 10')
         else:
             self.noFaceCount = 0
+        self.noRepeatName = False
         for (top, right, bottom, left), name in zip(self.face_locations, self.face_names):
-            top *= 4 #y
-            right *= 4 #x+w
-            bottom *= 4 #y+h
-            left *= 4 #x
+            top *= 2 #y
+            right *= 2 #x+w
+            bottom *= 2 #y+h
+            left *= 2 #x
 
 
             namePut = name.split('_')
@@ -216,15 +227,15 @@ class MinimalSubscriber(Node):
                 
                 if self.xulyframe >= 2:
                     if dx > 130:
-                        execute[1] = '10'
-                    elif dx < -104:
-                        execute[1] = '-10'
+                        execute[4] = '10'
+                    elif dx < -84:
+                        execute[4] = '-10'
                     else:
-                        execute[1] = '0'
+                        execute[4] = '0'
                         xalign = True
-                    if dy > 80:
+                    if dy > 75:
                         execute[3] = '-10'
-                    elif dy < -80:
+                    elif dy < -75:
                         execute[3] = '10'
                     else:
                         execute[3] = '0'
@@ -242,7 +253,7 @@ class MinimalSubscriber(Node):
                     else:
                         execute[2] = '0'
                         distanceAlign = True
-                    
+                    print(dx, dy, d-self.L0)
                     if xalign and yalign and distanceAlign:
                         cv2.putText(cv_image, "aligned", (left + 20, bottom + 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
 
@@ -250,7 +261,6 @@ class MinimalSubscriber(Node):
                     self.sendRequest(executeString)
                     self.xulyframe = 0
                 self.xulyframe += 1
-                print(self.xulyframe)
                 # Draw a box around the face
             cv2.rectangle(cv_image, (left, top), (right, bottom), (0, 0, 255), 2)
             
