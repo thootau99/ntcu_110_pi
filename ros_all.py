@@ -10,6 +10,7 @@ import string
 import face_recognition
 import datetime
 
+
 import sensor_msgs.msg as msg
 from rclpy.node import Node
 from threading import Thread
@@ -21,32 +22,8 @@ from cv_bridge import CvBridge
 
 # Initialize some variables
 
-# Create arrays of known face encodings and their names
+# Create arrays of known face encodings and their name
 
-class WebCamVideoStream:
-    def __init__(self, src=0):
-        self.stream = cv2.VideoCapture(src)
-        (self.grabbed, self.frame) = self.stream.read()
-
-        self.stopped = False
-
-    def start(self):
-        Thread(target=self.update, args=()).start()
-        return self
-    
-    def update(self):
-        while True:
-            if self.stopped:
-                return
-                
-            (self.grabbed, self.frame) = self.stream.read()
-
-    def read(self):
-        return self.frame
-
-    def stop(self):
-        self.stopped = True
-    
 class MinimalSubscriber(Node):
 
     def __init__(self):
@@ -244,7 +221,6 @@ class MinimalSubscriber(Node):
                 xalign = False
                 yalign = False
                 distanceAlign = False
-                #TODO: 改用組字串ㄉ寫
                 
                 if self.xulyframe >= 1:
                     if dx > 130:

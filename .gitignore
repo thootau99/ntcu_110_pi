@@ -1,2 +1,5 @@
 dataset_img/*
 .DS_Store
+__pycache__/*
+.vscode
+/node_modules
