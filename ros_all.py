@@ -192,7 +192,7 @@ class MinimalSubscriber(Node):
         if self.face_names == [] :
             self.noFaceCount += 1
             if self.noFaceCount > 20:
-                self.sendRequest('rc 0 0 0 10')
+                self.sendRequest('rc 0 0 0 20')
         else:
             self.noFaceCount = 0
         self.noRepeatName = False
@@ -231,17 +231,17 @@ class MinimalSubscriber(Node):
                         execute[4] = '0'
                         xalign = True
                     if dy > 75:
-                        execute[3] = '-10'
+                        execute[3] = '-13'
                     elif dy < -75:
-                        execute[3] = '10'
+                        execute[3] = '13'
                     else:
                         execute[3] = '0'
                         yalign = True
                     if (d-self.L0) > 15:
-                        execute[2] = '10'
+                        execute[2] = '13'
 
                     elif (d-self.L0) < -15:
-                        execute[2] = '-10'
+                        execute[2] = '-13'
                     elif (d-self.L0) < -50:
                         self.send_request('emergency')
                         self.destroy_node()
