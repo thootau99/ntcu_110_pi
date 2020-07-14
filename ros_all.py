@@ -9,8 +9,9 @@ import random
 import string
 import face_recognition
 import datetime
+import threading
 
-
+from std_msgs.msg import String
 import sensor_msgs.msg as msg
 from rclpy.node import Node
 from threading import Thread
@@ -34,11 +35,14 @@ class MinimalSubscriber(Node):
             self.listener_callback,
             10)
             # 加入 ROS-subscrciber, 訂閱 "image" 取得影像
+        self.subscriptionServer = self.create_subscription(
+            String,
+            'userCommand',
+            self.userCommandCallBack,
+            10)
         self.publisher_ = self.create_publisher(msg.Image, 'cvImage', 10) # 加入 ROS-publisher, 發出處理過的image
         self.subscription  # prevent unused variable warning
         self.telloCli = self.create_client(TelloAction, 'tello_action') #TODO: 待完成，call ros2 service
-        while not self.telloCli.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('service not available, waiting again...')
         self.telloCliRequest = TelloAction.Request()
         if self.telloCli.wait_for_service:
             self.sendRequest("rc 0 0 0 0")
@@ -47,10 +51,9 @@ class MinimalSubscriber(Node):
         self.names = []  # read_file 存名字 
         self.labels = [] # read_file 存路徑
         self.noFaceCount = 0
-
+        self.nameTest = 0
         self.noRepeatName = False
         self.noRepeatNameRecord = []
-
         self.L0 = 120   # 人與camera的距離
         self.S0 = 25600 # 預計的人臉框大小
         self.CX = 480   # 大約在畫面中間的 X 座標
@@ -72,7 +75,7 @@ class MinimalSubscriber(Node):
 
         self.dark = False # 看圖有沒有過黑
         self.read_path('./dataset_img') # 到 /dataset_img 讀資料
-
+        self.followName = ''
         l = locals()
         for item in self.names: # ! 讀取在 dataset_img 下的全部圖片
             l['%s_image'%item] = face_recognition.load_image_file("dataset_img/%s.jpg"%item)
@@ -83,9 +86,29 @@ class MinimalSubscriber(Node):
             else:
                 os.remove("./dataset_img/%s.jpg"%item)
                 print("removed dataset_img/%s.jpg"%item)
+
+    def userCommandCallBack(self, s):
+        print(s.data)
+        if s.data == 'takeoff':
+            pass
+
+        if s.data == 'land':
+            pass
+
     def sendRequest(self, s):
         self.telloCliRequest.cmd = s
         self.future = self.telloCli.call_async(self.telloCliRequest)
+
+    def setFollowName(self, s):
+        self.followName = s
+
+    def getFollowName(self):
+        self.followName = self.nameTest + 1
+        return self.followName
+
+    def getFaceNames(self):
+        return self.face_names
+        
     def listener_callback(self, image): #! 從image讀到cam image後觸發的 function
         try:
             cv_image = self.bridge.imgmsg_to_cv2(image, "bgr8") # 轉換
@@ -164,7 +187,7 @@ class MinimalSubscriber(Node):
                         previous_top = self.face_location_record[-2][0][0]
 
                         previous_right = self.face_location_record[-2][0][1]
-
+    
                         previous_botoom = self.face_location_record[-2][0][2]
                         previous_left = self.face_location_record[-2][0][3]
 
