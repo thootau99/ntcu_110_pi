@@ -3,6 +3,7 @@ import time
 import subprocess
 import rclpy
 import threading
+import json
 from tello_msgs.srv import TelloAction
 
 
@@ -17,9 +18,11 @@ class Publisher(Node):
     def __init__(self):
         super().__init__('userCommandNode')
 
-        self.publisher = self.create_publisher(String, 'userCommand')
+        self.create_subscription(String, "facename", self.sendBackFacename, 10)
+        self.publisher = self.create_publisher(String, 'facenameset')
         self.telloCli = self.create_client(TelloAction, 'tello_action')
         self.telloCliRequest = TelloAction.Request()
+        self.testCount = 0
     def send(self, s):
         self.publisher.publish(msg=s)
         print("published" + s.data)
@@ -28,18 +31,28 @@ class Publisher(Node):
         self.telloCliRequest.cmd = s
         self.future = self.telloCli.call_async(self.telloCliRequest)
 
-    def nothing(self):
-        return 0
-
-
-
+    def sendBackFacename(self, name):
+        if name.data == '':
+            return 0
+        sp = name.data
+        sp = sp.split(' ')
+        result = []
+        for i in sp:
+            i = i.split('_')
+            if i[0] in result:
+                pass
+            else:
+                result.append(i[0])
+        resultJson = '_'.join(result)
+        r = requests.get(SERVERIP + "/set_face?facename=" + resultJson)
+          
+    def setFaceName(self, name):
+        n = String()
+        n.data = name
+        self.publisher.publish(n)
 def getArg(pub):
     while True:
-        test = String()
-        test.data = "123123123"
-        pub.send(test)
-
-        pub.sendToTello("rc 0 1 1 1")
+    
         r = requests.get(SERVERIP + "/update_data")
         try:
             data = r.json()
@@ -51,6 +64,15 @@ def getArg(pub):
                 print('land')
                 cmd = 'land'
                 pub.sendToTello(cmd)
+            if data['instruction'] == 'setname':
+                print('setname' + data['name'])
+                pub.setFaceName(data['name'])
+            if data['instruction'] == 'stop':
+                print('stop')
+                pub.setFaceName('stop')
+            if data['instruction'] == 'start':
+                print('start')
+                pub.setFaceName('start')
         except:
             print('except')
         time.sleep(0.2)

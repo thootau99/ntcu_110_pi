@@ -37,10 +37,12 @@ class MinimalSubscriber(Node):
             # 加入 ROS-subscrciber, 訂閱 "image" 取得影像
         self.subscriptionServer = self.create_subscription(
             String,
-            'userCommand',
+            'facenameset',
             self.userCommandCallBack,
             10)
         self.publisher_ = self.create_publisher(msg.Image, 'cvImage', 10) # 加入 ROS-publisher, 發出處理過的image
+        self.publisher_facename = self.create_publisher(String, 'facename', 10)
+        
         self.subscription  # prevent unused variable warning
         self.telloCli = self.create_client(TelloAction, 'tello_action') #TODO: 待完成，call ros2 service
         self.telloCliRequest = TelloAction.Request()
@@ -62,7 +64,7 @@ class MinimalSubscriber(Node):
         self.face_locations = [] # 存解析輸入圖片後人臉的位置
         self.face_encodings = [] # 存解析輸入圖片後人臉的 code
         self.face_names = []     # 存解析輸入圖片後人臉的 name
-
+        self.stop = False
         self.face_location_record = [] # 記錄上次的人臉位置
         self.face_name_record = [] # 記錄上次的人臉名
         self.previous_have_name = False # 記錄上一次有沒有人名
@@ -89,11 +91,15 @@ class MinimalSubscriber(Node):
 
     def userCommandCallBack(self, s):
         print(s.data)
-        if s.data == 'takeoff':
-            pass
+        if s.data == 'stop':
+            self.stop = True 
+            print("system stop", self.stop)
+        elif s.data == 'start':
+            self.stop = False
+            print("system stop", self.stop)
 
-        if s.data == 'land':
-            pass
+        else:
+            self.followName = s.data
 
     def sendRequest(self, s):
         self.telloCliRequest.cmd = s
@@ -107,7 +113,10 @@ class MinimalSubscriber(Node):
         return self.followName
 
     def getFaceNames(self):
-        return self.face_names
+        s = String()
+        if len(self.face_names) != 0:
+            s.data = ' '.join(self.face_names)
+        return s
         
     def listener_callback(self, image): #! 從image讀到cam image後觸發的 function
         try:
@@ -136,159 +145,163 @@ class MinimalSubscriber(Node):
         
         rgb_small_frame = small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
 
+        if self.stop == False:
+            if self.process_this_frame:
 
-        if self.process_this_frame:
+                if self.dark:
+                    self.face_locations = face_recognition.face_locations(rgb_small_frame, number_of_times_to_upsample=3)
+                    # 若太黑就多掃描2次
+                    
+                else:
+                    self.face_locations = face_recognition.face_locations(rgb_small_frame) # 掃描在圖片中的臉一次
 
-            if self.dark:
-                self.face_locations = face_recognition.face_locations(rgb_small_frame, number_of_times_to_upsample=3)
-                # 若太黑就多掃描2次
+                self.face_encodings = face_recognition.face_encodings(rgb_small_frame, self.face_locations)
+                # 解析在畫面中的臉
+                self.face_names = []
+                if self.face_locations != '' and len(self.face_locations) != 0:
+                    self.face_location_record.append(self.face_locations)
                 
+                for face_encoding in self.face_encodings:
+                    matches = []
+                    matchesNamesCheckAgain = []
+
+                    name = "Unknown"
+                    for num in range(0,1,1):
+                        if self.dark == True:
+                            matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.9)
+                        else:
+                            matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.5)
+                        face_dis = face_recognition.face_distance(self.known_face_encodings, face_encoding)
+                        face_best = np.argmin(face_dis)
+                        matchesNamesCheckAgain.append(face_best)
+                    self.dark = False
+                    result = Counter(matchesNamesCheckAgain)
+                    most_common = result.most_common()
+                    if matches[most_common[0][0]]:
+                        name = self.known_face_names[most_common[0][0]]
+                        self.face_name_record.append(most_common[0][0])
+                        if name.split('_')[0] == 'uahuynhh':
+                            if self.noRepeatName:
+                                name = "Unknown"
+
+                            self.noRepeatName = True
+
+                        self.previous_have_name = True
+                    if name == "Unknown" and not self.noRepeatName:
+                        dtop = 0
+                        dright = 0
+                        dbottom = 0
+                        dleft = 0
+                        if self.previous_have_name and len(self.face_location_record) > 2:
+                            previous_top = self.face_location_record[-2][0][0]
+
+                            previous_right = self.face_location_record[-2][0][1]
+        
+                            previous_botoom = self.face_location_record[-2][0][2]
+                            previous_left = self.face_location_record[-2][0][3]
+
+                            current_top = self.face_location_record[-1][0][0]
+                            current_right = self.face_location_record[-1][0][1]
+                            current_bottom = self.face_location_record[-1][0][2]
+                            current_left = self.face_location_record[-1][0][3]
+
+                            dtop = abs(previous_top - current_top)
+                            dright = abs(previous_right - current_right)
+                            dbottom = abs(previous_botoom - current_bottom)
+                            dleft = abs(previous_left - current_left)
+                        if self.previous_have_name and len(self.face_name_record) > 1 and dtop < 20 and dright < 20 and dbottom < 20 and dleft < 20:
+                            name = self.known_face_names[self.face_name_record[-2]]
+                            self.unknownTakeAgainCount = self.unknownTakeAgainCount + 1
+                            self.previous_have_name = False
+                            self.unknowTakeAgain = True
+                            self.unknownTakeAgainName = name
+                    self.face_names.append(name)
+            if len(self.face_location_record) > 5:
+                self.face_location_record = []
+            if len(self.face_name_record) > 5:
+                self.face_name_record = []
+            self.process_this_frame = not self.process_this_frame
+            if self.face_names == [] :
+                self.noFaceCount += 1
+                if self.noFaceCount > 20:
+                    self.sendRequest('rc 0 0 0 20')
             else:
-                self.face_locations = face_recognition.face_locations(rgb_small_frame) # 掃描在圖片中的臉一次
-
-            self.face_encodings = face_recognition.face_encodings(rgb_small_frame, self.face_locations)
-            # 解析在畫面中的臉
-            self.face_names = []
-            if self.face_locations != '' and len(self.face_locations) != 0:
-                self.face_location_record.append(self.face_locations)
-            
-            for face_encoding in self.face_encodings:
-                matches = []
-                matchesNamesCheckAgain = []
-
-                name = "Unknown"
-                for num in range(0,1,1):
-                    if self.dark == True:
-                        matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.9)
-                    else:
-                        matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.5)
-                    face_dis = face_recognition.face_distance(self.known_face_encodings, face_encoding)
-                    face_best = np.argmin(face_dis)
-                    matchesNamesCheckAgain.append(face_best)
-                self.dark = False
-                result = Counter(matchesNamesCheckAgain)
-                most_common = result.most_common()
-                if matches[most_common[0][0]]:
-                    name = self.known_face_names[most_common[0][0]]
-                    self.face_name_record.append(most_common[0][0])
-                    if name.split('_')[0] == 'uahuynhh':
-                        if self.noRepeatName:
-                            name = "Unknown"
-
-                        self.noRepeatName = True
-
-                    self.previous_have_name = True
-                if name == "Unknown" and not self.noRepeatName:
-                    dtop = 0
-                    dright = 0
-                    dbottom = 0
-                    dleft = 0
-                    if self.previous_have_name and len(self.face_location_record) > 2:
-                        previous_top = self.face_location_record[-2][0][0]
-
-                        previous_right = self.face_location_record[-2][0][1]
-    
-                        previous_botoom = self.face_location_record[-2][0][2]
-                        previous_left = self.face_location_record[-2][0][3]
-
-                        current_top = self.face_location_record[-1][0][0]
-                        current_right = self.face_location_record[-1][0][1]
-                        current_bottom = self.face_location_record[-1][0][2]
-                        current_left = self.face_location_record[-1][0][3]
-
-                        dtop = abs(previous_top - current_top)
-                        dright = abs(previous_right - current_right)
-                        dbottom = abs(previous_botoom - current_bottom)
-                        dleft = abs(previous_left - current_left)
-                    if self.previous_have_name and len(self.face_name_record) > 1 and dtop < 20 and dright < 20 and dbottom < 20 and dleft < 20:
-                        name = self.known_face_names[self.face_name_record[-2]]
-                        self.unknownTakeAgainCount = self.unknownTakeAgainCount + 1
-                        self.previous_have_name = False
-                        self.unknowTakeAgain = True
-                        self.unknownTakeAgainName = name
-                self.face_names.append(name)
-        if len(self.face_location_record) > 5:
-            self.face_location_record = []
-        if len(self.face_name_record) > 5:
-            self.face_name_record = []
-        self.process_this_frame = not self.process_this_frame
-        if self.face_names == [] :
-            self.noFaceCount += 1
-            if self.noFaceCount > 20:
-                self.sendRequest('rc 0 0 0 20')
-        else:
-            self.noFaceCount = 0
-        self.noRepeatName = False
-        for (top, right, bottom, left), name in zip(self.face_locations, self.face_names):
-            top *= 2 #y
-            right *= 2 #x+w
-            bottom *= 2 #y+h
-            left *= 2 #x
+                self.noFaceCount = 0
+            self.noRepeatName = False
+            self.publisher_facename.publish(self.getFaceNames())
+            for (top, right, bottom, left), name in zip(self.face_locations, self.face_names):
+                top *= 2 #y
+                right *= 2 #x+w
+                bottom *= 2 #y+h
+                left *= 2 #x
 
 
-            namePut = name.split('_')
-            if self.unknowTakeAgain and name == self.unknownTakeAgainName and self.unknownTakeAgainCount > 3:
-                i = cv_image[top-50:bottom+50, left-50:right+50]
-                randstr = self.randomString(8)
-                cv2.imwrite('./dataset_img/%s_%s.jpg'%(self.unknownTakeAgainName, randstr),i)
-                self.unknowTakeAgain = False
-                self.unknownTakeAgainName = ''
-                self.unknownTakeAgainCount = 0
-            execute = ['rc', '0', '0', '0', '0']
-            if namePut[0] == 'uahuynhh':
-                width = right - left
-                height = bottom - top
-                dx = left + width/2 - self.CX ## x + w/2 - cx
-                dy = top + height/2 - self.CY ## y + h/2 - cy
-                d = round(self.L0 * m.sqrt(self.S0 / (width * height)))
-                xalign = False
-                yalign = False
-                distanceAlign = False
+                namePut = name.split('_')
+                if self.unknowTakeAgain and name == self.unknownTakeAgainName and self.unknownTakeAgainCount > 3:
+                    i = cv_image[top-50:bottom+50, left-50:right+50]
+                    randstr = self.randomString(8)
+                    cv2.imwrite('./dataset_img/%s_%s.jpg'%(self.unknownTakeAgainName, randstr),i)
+                    self.unknowTakeAgain = False
+                    self.unknownTakeAgainName = ''
+                    self.unknownTakeAgainCount = 0
+                execute = ['rc', '0', '0', '0', '0']
+                print(self.followName)
+                if namePut[0] == self.followName:
+                    width = right - left
+                    height = bottom - top
+                    dx = left + width/2 - self.CX ## x + w/2 - cx
+                    dy = top + height/2 - self.CY ## y + h/2 - cy
+                    d = round(self.L0 * m.sqrt(self.S0 / (width * height)))
+                    xalign = False
+                    yalign = False
+                    distanceAlign = False
+                    
+                    if self.xulyframe >= 1:
+                        if dx > 130:
+                            execute[4] = '13'
+                        elif dx < -84:
+                            execute[4] = '-13'
+                        else:
+                            execute[4] = '0'
+                            xalign = True
+                        if dy > 75:
+                            execute[3] = '-13'
+                        elif dy < -75:
+                            execute[3] = '13'
+                        else:
+                            execute[3] = '0'
+                            yalign = True
+                        if (d-self.L0) > 15:
+                            execute[2] = '13'
+
+                        elif (d-self.L0) < -15:
+                            execute[2] = '-13'
+                        elif (d-self.L0) < -50:
+                            self.send_request('emergency')
+                            self.destroy_node()
+                            rclpy.shutdown()
+                            exit()
+                        else:
+                            execute[2] = '0'
+                            distanceAlign = True
+                        if xalign and yalign and distanceAlign:
+                            cv2.putText(cv_image, "aligned", (left + 20, bottom + 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
+
+                        executeString = ' '.join(execute)
+                        self.sendRequest(executeString)
+                        self.xulyframe = 0
+                    self.xulyframe += 1
+                    # Draw a box around the face
+                cv2.rectangle(cv_image, (left, top), (right, bottom), (0, 0, 255), 2)
                 
-                if self.xulyframe >= 1:
-                    if dx > 130:
-                        execute[4] = '13'
-                    elif dx < -84:
-                        execute[4] = '-13'
-                    else:
-                        execute[4] = '0'
-                        xalign = True
-                    if dy > 75:
-                        execute[3] = '-13'
-                    elif dy < -75:
-                        execute[3] = '13'
-                    else:
-                        execute[3] = '0'
-                        yalign = True
-                    if (d-self.L0) > 15:
-                        execute[2] = '13'
-
-                    elif (d-self.L0) < -15:
-                        execute[2] = '-13'
-                    elif (d-self.L0) < -50:
-                        self.send_request('emergency')
-                        self.destroy_node()
-                        rclpy.shutdown()
-                        exit()
-                    else:
-                        execute[2] = '0'
-                        distanceAlign = True
-                    if xalign and yalign and distanceAlign:
-                        cv2.putText(cv_image, "aligned", (left + 20, bottom + 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
-
-                    executeString = ' '.join(execute)
-                    self.sendRequest(executeString)
-                    self.xulyframe = 0
-                self.xulyframe += 1
-                # Draw a box around the face
-            cv2.rectangle(cv_image, (left, top), (right, bottom), (0, 0, 255), 2)
-            
 
 
-                # Draw a label with a name below the face
-            cv2.rectangle(cv_image, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
-            font = cv2.FONT_HERSHEY_DUPLEX
-            cv2.putText(cv_image, namePut[0], (left + 6, bottom - 6), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
+                    # Draw a label with a name below the face
+                cv2.rectangle(cv_image, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
+                font = cv2.FONT_HERSHEY_DUPLEX
+                cv2.putText(cv_image, namePut[0], (left + 6, bottom - 6), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
+        else:
+            self.sendRequest('rc 0 0 0 0')
 
         transback = self.bridge.cv2_to_imgmsg(cv_image, "bgr8")
         self.publisher_.publish(transback)
