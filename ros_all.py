@@ -18,6 +18,7 @@ from threading import Thread
 from tello_msgs.srv import TelloAction
 from cv_bridge import CvBridge
 
+import detect_mask_video
 
 print('aaa')
 
@@ -77,7 +78,9 @@ class MinimalSubscriber(Node):
 
         self.dark = False # 看圖有沒有過黑
         self.read_path('./dataset_img') # 到 /dataset_img 讀資料
-        self.followName = ''
+        self.followName = 'uahuynhh'
+
+        self.mode = 'mask'
         l = locals()
         for item in self.names: # ! 讀取在 dataset_img 下的全部圖片
             l['%s_image'%item] = face_recognition.load_image_file("dataset_img/%s.jpg"%item)
@@ -97,9 +100,15 @@ class MinimalSubscriber(Node):
         elif s.data == 'start':
             self.stop = False
             print("system stop", self.stop)
-
+        elif s.data == 'mask':
+            self.mode = 'mask'
+            print('system switch to mask mode')
+        elif s.data == 'normal':
+            self.mode = 'normal'
+            print('system switch to normal mode')
         else:
             self.followName = s.data
+            print(self.followName)
 
     def sendRequest(self, s):
         self.telloCliRequest.cmd = s
@@ -145,15 +154,9 @@ class MinimalSubscriber(Node):
         
         rgb_small_frame = small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
 
-        if self.stop == False:
+        if self.stop == False and self.mode == 'normal':
             if self.process_this_frame:
-
-                if self.dark:
-                    self.face_locations = face_recognition.face_locations(rgb_small_frame, number_of_times_to_upsample=3)
-                    # 若太黑就多掃描2次
-                    
-                else:
-                    self.face_locations = face_recognition.face_locations(rgb_small_frame) # 掃描在圖片中的臉一次
+                self.face_locations = face_recognition.face_locations(rgb_small_frame) # 掃描在圖片中的臉一次
 
                 self.face_encodings = face_recognition.face_encodings(rgb_small_frame, self.face_locations)
                 # 解析在畫面中的臉
@@ -180,7 +183,7 @@ class MinimalSubscriber(Node):
                     if matches[most_common[0][0]]:
                         name = self.known_face_names[most_common[0][0]]
                         self.face_name_record.append(most_common[0][0])
-                        if name.split('_')[0] == 'uahuynhh':
+                        if name.split('_')[0] == self.followName:
                             if self.noRepeatName:
                                 name = "Unknown"
 
@@ -245,7 +248,6 @@ class MinimalSubscriber(Node):
                     self.unknownTakeAgainName = ''
                     self.unknownTakeAgainCount = 0
                 execute = ['rc', '0', '0', '0', '0']
-                print(self.followName)
                 if namePut[0] == self.followName:
                     width = right - left
                     height = bottom - top
@@ -300,9 +302,52 @@ class MinimalSubscriber(Node):
                 cv2.rectangle(cv_image, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
                 font = cv2.FONT_HERSHEY_DUPLEX
                 cv2.putText(cv_image, namePut[0], (left + 6, bottom - 6), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
+        elif self.stop == False and self.mode == "mask":
+            (locs, preds) = detect_mask_video.main(small_frame)
+            for (box, pred) in zip(locs, preds):
+            # unpack the bounding box and predictions
+                (startX, startY, endX, endY) = box
+                startX = startX * 2
+                startY = startY * 2
+                endX = endX * 2
+                endY = endY * 2
+                (mask, withoutMask) = pred
+                img = cv_image[startY:startY+endY, startX:startX+endX]
+
+                faceLocation = face_recognition.face_locations(img)
+                encoding = face_recognition.face_encodings(img ,faceLocation)
+                
+                # detect face name on frame?
+                name = "Unknown"
+
+                for face_encoding in encoding:
+                    matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding)
+                    
+
+                    face_distance = face_recognition.face_distance(self.known_face_encodings, face_encoding)
+                    best_match_index = np.argmin(face_distance)
+                    if matches[best_match_index]:
+                        name = self.known_face_names[best_match_index]
+                    name = name.split('_')
+                    print(name)
+                    name = name[0]
+
+                # determine the class label and color we'll use to draw
+                # the bounding box and text
+                label = name + "Mask" if mask > withoutMask else name +"No Mask"
+                color = (0, 255, 0) if label == "Mask" else (0, 0, 255)
+                # include the probability in the label
+
+                label = "{}: {:.2f}%".format(label, max(mask, withoutMask) * 100)
+
+                # display the label and bounding box rectangle on the output
+                # frame
+                cv2.putText(cv_image, label, (startX, startY - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 2)
+                cv2.rectangle(cv_image, (startX, startY), (endX, endY), color, 2)
+
         else:
             self.sendRequest('rc 0 0 0 0')
-
         transback = self.bridge.cv2_to_imgmsg(cv_image, "bgr8")
         self.publisher_.publish(transback)
     

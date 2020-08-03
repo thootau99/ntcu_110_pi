@@ -73,6 +73,12 @@ def getArg(pub):
             if data['instruction'] == 'start':
                 print('start')
                 pub.setFaceName('start')
+            if data['instruction'] == 'mask':
+                print('mask')
+                pub.setFaceName('mask')
+            if data['instruction'] == 'normal':
+                print('normal')
+                pub.setFaceName('normal')
         except:
             print('except')
         time.sleep(0.2)
