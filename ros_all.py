@@ -19,7 +19,7 @@ from tello_msgs.srv import TelloAction
 from cv_bridge import CvBridge
 
 
-
+print('aaa')
 
 # Initialize some variables
 
