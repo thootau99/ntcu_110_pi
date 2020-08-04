@@ -255,7 +255,7 @@ class MinimalSubscriber(Node):
                     dy = top + height/2 - self.CY ## y + h/2 - cy
                     d = round(self.L0 * m.sqrt(self.S0 / (width * height)))
                     xalign = False
-                    yalign = False
+                    yalign = False                                     
                     distanceAlign = False
                     
                     if self.xulyframe >= 1:
@@ -318,24 +318,24 @@ class MinimalSubscriber(Node):
                 encoding = face_recognition.face_encodings(img ,faceLocation)
                 
                 # detect face name on frame?
-                name = "Unknown"
+                name = ""
 
-                for face_encoding in encoding:
-                    matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding)
+                # for face_encoding in encoding:
+                #     matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding)
                     
 
-                    face_distance = face_recognition.face_distance(self.known_face_encodings, face_encoding)
-                    best_match_index = np.argmin(face_distance)
-                    if matches[best_match_index]:
-                        name = self.known_face_names[best_match_index]
-                    name = name.split('_')
-                    print(name)
-                    name = name[0]
+                #     face_distance = face_recognition.face_distance(self.known_face_encodings, face_encoding)
+                #     best_match_index = np.argmin(face_distance)
+                #     if matches[best_match_index]:
+                #         name = self.known_face_names[best_match_index]
+                #     name = name.split('_')
+                #     print(name)
+                #     name = name[0]
 
                 # determine the class label and color we'll use to draw
                 # the bounding box and text
                 label = name + "Mask" if mask > withoutMask else name +"No Mask"
-                color = (0, 255, 0) if label == "Mask" else (0, 0, 255)
+                color = (0, 255, 0) if label == name + "Mask" else (0, 0, 255)
                 # include the probability in the label
 
                 label = "{}: {:.2f}%".format(label, max(mask, withoutMask) * 100)
@@ -355,7 +355,7 @@ class MinimalSubscriber(Node):
         letters = string.ascii_lowercase
         return ''.join(random.choice(letters) for i in range(stringLength))
 
-    def read_path(self, path_name):
+    def read_path(self, path_name):driver]: Command timed out
 
         for dir_item in os.listdir(path_name):
             full_path = os.path.abspath(os.path.join(path_name, dir_item))
