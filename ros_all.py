@@ -11,6 +11,7 @@ import face_recognition
 import datetime
 import threading
 
+
 from std_msgs.msg import String
 import sensor_msgs.msg as msg
 from rclpy.node import Node
@@ -19,7 +20,8 @@ from tello_msgs.srv import TelloAction
 from cv_bridge import CvBridge
 
 import detect_mask_video
-
+from fix import check
+from aruco import aru
 print('aaa')
 
 # Initialize some variables
@@ -153,7 +155,60 @@ class MinimalSubscriber(Node):
         #     rgb_small_frame = small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
         
         rgb_small_frame = small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
+        # check(small_frame)
+        aru_x = []
+        aru_y = []
+        aru_z = []
+        aru_distance = []
+        aru_id = []
+        index = 0
+        aru_x,aru_y,aru_z,aru_distance,aru_id = aru(small_frame)
+        if len(aru_id) != 0:
+            align = False
+            x = False
+            y = False
+            for ids in aru_id:
+                instruction = ['rc', '0', '0', '0', '0']
+                print(aru_x[index], aru_y[index], aru_z[index])
+                if aru_distance[index] > 40:
+                    self.sendRequest("rc 0 13 0 0")
+                elif not align:
+                    if aru_x[index] < -0.06:
+                        instruction[2] = '13'
+                    elif aru_x[index] > 0.36:
+                        instruction[2] = '-13'
+                    else:
+                        x = True
 
+                    if aru_y[index] < -0.33:
+                        instruction[3] = '13'
+                    elif aru_y[index] > -0.13:
+                        instruction[3] = '-13'
+                    else:
+                        y = True
+                    if x and y:
+                        align = True 
+                    else:
+                        ins = ' '.join(instruction)
+                        self.sendRequest(ins)
+                if align:
+                    if ids[0] == 7:
+                        if aru_distance[index] < 40:
+                            self.sendRequest("land")
+                    elif ids[0] == 6:
+                        if aru_distance[index] < 40:
+                            self.sendRequest("takeoff")
+                    elif ids[0] == 0:
+                        if aru_distance[index] < 40:
+                            self.sendRequest("rc 0 0 0 0")
+                            self.sendRequest("cw 90")
+                    x = False
+                    y = False
+                    align = False
+                if ids[0] == 7:
+                    self.sendRequest("land")
+                index = index + 1
+    
         if self.stop == False and self.mode == 'normal':
             if self.process_this_frame:
                 self.face_locations = face_recognition.face_locations(rgb_small_frame) # 掃描在圖片中的臉一次
@@ -355,7 +410,7 @@ class MinimalSubscriber(Node):
         letters = string.ascii_lowercase
         return ''.join(random.choice(letters) for i in range(stringLength))
 
-    def read_path(self, path_name):driver]: Command timed out
+    def read_path(self, path_name):
 
         for dir_item in os.listdir(path_name):
             full_path = os.path.abspath(os.path.join(path_name, dir_item))
