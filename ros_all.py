@@ -169,22 +169,48 @@ class MinimalSubscriber(Node):
             y = False
             for ids in aru_id:
                 instruction = ['rc', '0', '0', '0', '0']
-                print(aru_x[index], aru_y[index], aru_z[index])
+                print(aru_distance[index])
+
+                print("X:",aru_x[index])
+                print("Y:", aru_y[index])
+
                 if aru_distance[index] > 40:
-                    self.sendRequest("rc 0 13 0 0")
-                elif not align:
-                    if aru_x[index] < -0.06:
-                        instruction[2] = '13'
-                    elif aru_x[index] > 0.36:
-                        instruction[2] = '-13'
+                    if aru_x[index] < -0.01:
+                        instruction[1] = '-10'
+                    elif aru_x[index] > 0.8:
+                        instruction[1] = '10'
                     else:
+                        instruction[1] = '0'
+                        instruction[2] = '10'
+                    
+                    if aru_y[index] < -0.4:
+                        instruction[3] = '10'
+                    elif aru_y[index] > 0.14:
+                        instruction[3] = '-10'
+                    else:
+                        instruction[3] = '0'
+                        instruction[2] = '10'
+
+                    ins = ' '.join(instruction)
+                    self.sendRequest(ins)
+                elif not align:
+                    print("z aligned")
+                    if aru_x[index] < -0.06:
+                        print("qua left")
+                        instruction[1] = '-10'
+                    elif aru_x[index] > 0.36:
+                        print("qua right")
+                        instruction[1] = '10'
+                    else:
+                        print("x aligned")
                         x = True
 
                     if aru_y[index] < -0.33:
-                        instruction[3] = '13'
-                    elif aru_y[index] > -0.13:
-                        instruction[3] = '-13'
+                        instruction[3] = '10'
+                    elif aru_y[index] > -0.01:
+                        instruction[3] = '-10'
                     else:
+                        print("y aligned")
                         y = True
                     if x and y:
                         align = True 
@@ -205,8 +231,7 @@ class MinimalSubscriber(Node):
                     x = False
                     y = False
                     align = False
-                if ids[0] == 7:
-                    self.sendRequest("land")
+                
                 index = index + 1
     
         if self.stop == False and self.mode == 'normal':

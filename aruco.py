@@ -47,7 +47,7 @@ def aru(frame):
                 x.append(tvec[0])
                 y.append(tvec[1])
                 z.append(tvec[2])
-                d.append(tvec[2] * 2.4)
+                d.append(tvec[2] * 24)
                 # print("%.1f cm -- %.0f deg" % ((tvec[2] * 2.5), (rvec[2] / math.pi * 180)))
                 
                 draw_pole_length = marker_length/2 # 現実での長さ[m]
