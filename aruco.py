@@ -9,6 +9,9 @@ parameters = aruco.DetectorParameters_create()
 
 parameters.cornerRefinementMethod = aruco.CORNER_REFINE_CONTOUR
 
+cc = cv2.VideoWriter_fourcc(*'XVID')
+out = cv2.VideoWriter('output.avi', cc, 20.0, (480, 360))
+
 def aru(frame):
     cnt=0
     marker_length = 0.1
@@ -27,6 +30,7 @@ def aru(frame):
         y = []
         z = []
         d = []
+        yaw = []
         if len(corners) > 0:
             for i, corner in enumerate(corners):
                 # rvec -> rotation vector, tvec -> translation vector
@@ -48,12 +52,14 @@ def aru(frame):
                 y.append(tvec[1])
                 z.append(tvec[2])
                 d.append(tvec[2] * 24)
+                yaw.append(euler_angle[0])
                 # print("%.1f cm -- %.0f deg" % ((tvec[2] * 2.5), (rvec[2] / math.pi * 180)))
                 
                 draw_pole_length = marker_length/2 # 現実での長さ[m]
                 aruco.drawAxis(frame, camera_matrix, distortion_coeff, rvec, tvec, draw_pole_length)
 
-        cv2.imshow('fa', frame)
+        cv2.imshow('facccc', frame)
+        out.write(frame)
         cnt+=1
 
         key = cv2.waitKey(50)
@@ -63,9 +69,13 @@ def aru(frame):
         try:
             if ids == None:
                 ids = []
+                x = []
+                y = []
+                z = []
+                d = []
         except:
             pass
-        return x, y, z, d, ids
+        return x, y, z, d, yaw,ids
 
     if __name__ == "__main__":
         main()
