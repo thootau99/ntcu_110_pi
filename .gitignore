@@ -3,3 +3,4 @@ dataset_img/*
 __pycache__/*
 .vscode
 /node_modules
+output.avi

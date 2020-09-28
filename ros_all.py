@@ -90,6 +90,23 @@ class MinimalSubscriber(Node):
 
         self.mode = 'mask'
         l = locals()
+                    # if abs(aru_deg[index][0]) > 150 and abs(aru_deg[index][0]) < 168:
+                    #     aru_deg[index][0] = abs(aru_deg[index][0])
+                    #     print(aru_deg[index][0], "deg absed")
+
+                    
+                    # if aru_deg[index][0] < -90 and aru_deg[index][0] > -150:
+                    #     instruction = ['rc', '0', '0', '0', '0']
+                    #     instruction[4] = "-10"
+                    #     instruction[2] = "-3"
+                    #     print(aru_deg[index][0], "deg qua left")
+
+                    # elif aru_deg[index][0] > 90 and aru_deg[index][0] < 150:
+                    #     instruction = ['rc', '0', '0', '0', '0']
+                    #     instruction[4] = '10'
+                    #     instruction[2] = '-3'
+                    #     print(aru_deg[index][0], "deg qua right")
+
         for item in self.names: # ! 讀取在 dataset_img 下的全部圖片
             l['%s_image'%item] = face_recognition.load_image_file("dataset_img/%s.jpg"%item)
             if len(face_recognition.face_encodings(l['%s_image'%item])) != 0:
@@ -229,7 +246,7 @@ class MinimalSubscriber(Node):
                 # print("Y:", aru_y[index])
                 print(aru_distance[index])
                 if aru_distance[index] < self.aruBound[0]:
-                    self.sendRequest("rc 0 -10 0 0") # x z y
+                    self.sendRequest("rc 0 -10 0 0") # x z y raw
                     self.aruLockCode = 'back'
                     self.aruLock = True
                     continue
