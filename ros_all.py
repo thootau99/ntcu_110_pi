@@ -81,7 +81,8 @@ class MinimalSubscriber(Node):
         self.aruBound = [80, 90]
         self.dark = False # 看圖有沒有過黑
         self.read_path('./dataset_img') # 到 /dataset_img 讀資料
-        self.followName = 'uahuynh        self.aruTarget = 4
+        self.followName = 'uahuynh'        
+        self.aruTarget = 4
         self.aruLocation = {'id': '', 'left': False, 'right': False, 'top': False, 'bottom': False}
         self.locationFixed = False
         self.aruLockCode = 'None'
