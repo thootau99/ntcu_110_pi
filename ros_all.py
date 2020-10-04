@@ -81,11 +81,12 @@ class MinimalSubscriber(Node):
         self.aruBound = [80, 90]
         self.dark = False # 看圖有沒有過黑
         self.read_path('./dataset_img') # 到 /dataset_img 讀資料
-        self.followName = 'uahuynhh'
-        self.aruTarget = 1
+        self.followName = 'uahuynh        self.aruTarget = 4
         self.aruLocation = {'id': '', 'left': False, 'right': False, 'top': False, 'bottom': False}
         self.locationFixed = False
         self.aruLockCode = 'None'
+        self.alignLock = False
+        self.traceLocationAruco = False
         self.scannedArucoCode = []
 
         self.mode = 'mask'
@@ -190,7 +191,6 @@ class MinimalSubscriber(Node):
         align = False #TODO: test
         index = 0
         aru_x,aru_y,aru_z,aru_distance,aru_deg, aru_id = aru(small_frame)
-
         if self.aruLock:
             if self.aruLockCode == 'back':
                 self.sendRequest('rc 0 -10 0 0')
@@ -199,8 +199,8 @@ class MinimalSubscriber(Node):
             else:
                 self.sendRequest('rc 0 0 0 0')
 
-        if self.aruTarget == 3 and len(aru_id) == 0:
-            self.sendRequest('rc -5 0 0 0')
+        # if self.aruTarget == 3 and len(aru_id) == 0:
+        #     self.sendRequest('rc -5 0 0 0')
         
         # if self.aruLocation['id'] == self.aruTarget and len(aru_id) == 0 and self.locationFixed:
 
@@ -220,31 +220,52 @@ class MinimalSubscriber(Node):
         #     self.sendRequest(instruction)
 
 
-        elif len(aru_id) != 0:
+        if len(aru_id) != 0:
+            if self.alignLock:
+                align = True
+            
             align = False
             x = False
             y = False
-            self.aruLockCode = ''
-            self.aruLock = False
             print("Target:", self.aruTarget)
             if self.aruTarget == 2 and len(aru_id) > 1 and self.aruLock:
                 self.aruLock = False
             for ids in aru_id:
+                if ids[0] != 0: 
+                    print(ids,aru_distance[index])
+                else:
+                    print(aru_distance[index] * 1.5)
+                if ids[0] != self.aruTarget:
+                    continue
                 self.locationFixed = False
-                print(ids[0], self.aruTarget)
                 if ids[0] == self.aruTarget:
                     self.aruLocation['id'] = ids[0]
                     self.locationFixed = True
                 if ids[0] == 2 and self.aruTarget == 2:
-                    self.aruLock = False 
+                    if aru_distance[index] < 200:
+                        self.aruLock = False
+                if ids[0] == 0 and self.aruTarget == 0:
+                    print("id[0] processing...", self.aruLock)
+                    aru_distance[index] = aru_distance[index] * 1.5
+                    if aru_distance[index] < 240:
+                        self.aruLock = False
+                        self.aruTarget = 5
+                        self.sendRequest("cw 90")
+                        self.alignLock = False
+                        break
                 # if ids[0] != self.aruTarget or self.aruLock:
                 #     continue
+                if ids[0] != self.aruTarget:
+                    continue
                 instruction = ['rc', '0', '0', '0', '0']
                 # print(aru_distance[index])
 
                 # print("X:",aru_x[index])
                 # print("Y:", aru_y[index])
-                print(aru_distance[index])
+                if ids[0] == 0:
+                    aru_distance[index] = aru_distance[index] * 3
+                else:
+                    self.aruBound = [80, 90]
                 if aru_distance[index] < self.aruBound[0]:
                     self.sendRequest("rc 0 -10 0 0") # x z y raw
                     self.aruLockCode = 'back'
@@ -265,21 +286,25 @@ class MinimalSubscriber(Node):
                             self.aruLocation['left'] = False
                             self.aruLocation['right'] = True
                     else:
-                        instruction[1] = '5'
-                        instruction[2] = '10'
-                        if self.locationFixed:
-                            self.aruLocation['left'] = False
-                            self.aruLocation['right'] = False
+                        if aru_distance[index] < 150:
+                            instruction[1] = '5'
+                            instruction[2] = '10'
+                            if self.locationFixed:
+                                self.aruLocation['left'] = False
+                                self.aruLocation['right'] = False
+                        else:
+                            instruction[2] = '10'
+                            
                         
                     
-                    if aru_y[index] < -0.4:
+                    if aru_y[index] < -0.4 and aru_distance[index] < 150:
                         instruction[3] = '18'
                         instruction[2] = '0'
                         if self.locationFixed:
                             self.aruLocation['bottom'] = True
                             self.aruLocation['top'] = False
 
-                    elif aru_y[index] > 0.14:
+                    elif aru_y[index] > 0.14 and aru_distance[index] < 150:
                         instruction[3] = '-10'
                         instruction[2] = '0'
                         if self.locationFixed:
@@ -298,6 +323,7 @@ class MinimalSubscriber(Node):
                     #     print(aru_deg[index][0], "deg absed")
 
                     
+                            self.scannedArucoCode.append(0)
                     # if aru_deg[index][0] < -90 and aru_deg[index][0] > -150:
                     #     instruction = ['rc', '0', '0', '0', '0']
                     #     instruction[4] = "-10"
@@ -360,12 +386,14 @@ class MinimalSubscriber(Node):
                         self.sendRequest(ins)
                 # print(ids[0], aru_distance[index])
                 if align:
-                    if ids[0] == 1 and self.aruTarget == 1:
+                    if ids[0] == 4 and self.aruTarget == 4:
                         if aru_distance[index] < self.aruBound[1]:
                             self.sendRequest("cw -90")
+                            self.aruLock = True
+                            self.aruLockCode = 'forward'
                         instruction[3] = '13'
-                        self.aruTarget = 5
-                        if self.locationFixed:
+                        self.aruTarget = 2
+                        if self.locationFixed: 
 
                             self.aruLocation['bottom'] = True
                             self.aruLocation['top'] = False
@@ -375,33 +403,31 @@ class MinimalSubscriber(Node):
 
                             
 
-                    elif ids[0] == 2 and 1 in self.scannedArucoCode:
+                    elif ids[0] == 2 and self.aruTarget == 2:
+                        print(aru_distance[index], self.aruBound[1])
+                        print(aru_distance[index], self.aruBound[1])
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("land")
-                            self.sendRequest("land")
+                            self.sendRequest("cw -180")
                             self.scannedArucoCode.append(2)
-                            self.aruTarget = 3
+                            self.aruTarget = 0
+                            self.aruBound = [270, 290]
+                            self.alignLock = True
+                            self.aruLock = True
+                            self.aruLockCode = 'forward'
                     
-                    elif ids[0] == 3 and 2 in self.scannedArucoCode:
+                    elif ids[0] == 3 and self.aruTarget == 3:
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("rc 0 0 0 0")
-                            self.sendRequest("cw 90")
-                            self.sendRequest("rc 0 -5 0 0")
-                            self.scannedArucoCode.append(3)
-                            self.aruTarget = 5
-                    elif ids[0] == 5:
+                            self.aruTarget = 0
+                            self.traceLocationAruco = True
+                    elif ids[0] == 0 and self.aruTarget == 0:
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("land")
-                    elif ids[0] == 7:
+                            pass
+                    elif ids[0] == 5 and self.aruTarget == 5:
                         if aru_distance[index] < self.aruBound[1]:
                             self.sendRequest("land")
                     elif ids[0] == 6:
                         self.sendRequest("takeoff")
 
-                    
-                    elif ids[0] == 0:
-                        if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("cw 90")
                     x = False
                     y = False
                 
