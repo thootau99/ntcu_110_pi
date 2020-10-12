@@ -83,7 +83,8 @@ class MinimalSubscriber(Node):
         self.read_path('./dataset_img') # 到 /dataset_img 讀資料
         self.followName = 'uahuynh'        
         self.aruTarget = 0
-        self.aruSide = [0]
+        self.aruSide = []
+        self.aruFar = [0]
         self.aruGoMode = 'go'
         self.aruLocation = {'id': '', 'left': False, 'right': False, 'top': False, 'bottom': False}
         self.locationFixed = False
@@ -157,7 +158,10 @@ class MinimalSubscriber(Node):
         if len(self.face_names) != 0:
             s.data = ' '.join(self.face_names)
         return s
-        
+    
+    def aruBeLock(self, mode, s):
+        self.aruLock = s
+        self.aruLockCode = mode
     def listener_callback(self, image): #! 從image讀到cam image後觸發的 function
         try:
             cv_image = self.bridge.imgmsg_to_cv2(image, "bgr8") # 轉換
@@ -184,7 +188,7 @@ class MinimalSubscriber(Node):
         #     rgb_small_frame = small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
         
         rgb_small_frame = small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
-        # check(small_frame)
+        # check(cv_image)
         aru_x = []
         aru_y = []
         aru_z = []
@@ -232,7 +236,7 @@ class MinimalSubscriber(Node):
             y = False
             print("Target:", self.aruTarget)
             if self.aruTarget == 2 and len(aru_id) > 1 and self.aruLock:
-                self.aruLock = False
+                self.aruBeLock('', False)
             for ids in aru_id:
                 side = False
                 if ids[0] != 0: 
@@ -247,9 +251,9 @@ class MinimalSubscriber(Node):
                 if ids[0] == self.aruTarget:
                     self.aruLocation['id'] = ids[0]
                     self.locationFixed = True
-                # if ids[0] == 2 and self.aruTarget == 2:
-                #     if aru_distance[index] < 200:
-                #         self.aruLock = False
+                if ids[0] in self.aruFar and self.aruTarget == ids[0]:
+                    if aru_distance[index] < 200:
+                        self.aruBeLock('', False)
                 # if ids[0] == 0 and self.aruTarget == 0:
                 #     print("id[0] processing...", self.aruLock)
                 #     aru_distance[index] = aru_distance[index] * 1.5
@@ -271,10 +275,11 @@ class MinimalSubscriber(Node):
                 if ids[0] == 0:
                     aru_distance[index] = aru_distance[index] * 3
                 if aru_distance[index] < self.aruBound[0]:
-                    self.sendRequest("rc 0 -10 0 0") # x z y raw
-                    self.aruLockCode = 'back'
-                    self.aruLock = True
+                    # self.sendRequest("rc 0 -10 0 0") # x z y raw
+                    self.aruBeLock('back', True)
                     continue
+                elif aru_distance[index] > self.aruBound[0] and self.aruLock == True:
+                    self.aruBeLock('', False)
                 if aru_distance[index] > self.aruBound[1]:
                     if aru_x[index] < -0.01 and not side:
                         instruction[1] = '-11'
@@ -448,6 +453,8 @@ class MinimalSubscriber(Node):
                     y = False
                 
                 index = index + 1
+        elif self.aruTarget in self.aruFar and not self.aruLock:
+            self.aruBeLock("forward", True)
         if self.stop == False and self.mode == 'normal':
             if self.process_this_frame:
                 self.face_locations = face_recognition.face_locations(rgb_small_frame) # 掃描在圖片中的臉一次
