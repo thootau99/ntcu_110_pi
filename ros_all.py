@@ -78,13 +78,16 @@ class MinimalSubscriber(Node):
         self.known_face_encodings = [] # 存解析 database 中的人臉
         self.known_face_names = [] # 存解析 database 中的人名
         self.aruLock = False
-        self.aruBound = [80, 90]
+        self.aruAlignSwitch = False
+        self.aruBound = [100, 130]
         self.dark = False # 看圖有沒有過黑
         self.read_path('./dataset_img') # 到 /dataset_img 讀資料
         self.followName = 'uahuynh'        
         self.aruTarget = 0
         self.aruSide = []
-        self.aruFar = [0]
+        self.aruFar = [0,2,3,4,5,6,7,8]
+        self.aruTempTarget = 0
+        self.aruAligning = False
         self.aruGoMode = 'go'
         self.aruLocation = {'id': '', 'left': False, 'right': False, 'top': False, 'bottom': False}
         self.locationFixed = False
@@ -198,14 +201,15 @@ class MinimalSubscriber(Node):
         align = False #TODO: test
         index = 0
         aru_x,aru_y,aru_z,aru_distance,aru_deg, aru_id = aru(small_frame)
+        self.aruAlignSwitch = False
         if self.aruLock:
             if self.aruLockCode == 'back':
                 self.sendRequest('rc 0 -10 0 0')
             elif self.aruLockCode == 'forward':
-                self.sendRequest('rc 0 10 0 0')
+                    self.sendRequest('rc 0 22 0 0')
             else:
                 self.sendRequest('rc 0 0 0 0')
-
+        print("aruLock:", self.aruLock, "aruLockCode:",self.aruLockCode)
         # if self.aruTarget == 3 and len(aru_id) == 0:
         #     self.sendRequest('rc -5 0 0 0')
         
@@ -217,7 +221,7 @@ class MinimalSubscriber(Node):
         #         instruction[1] = '-7'
         #     elif self.aruLocation['right']:
         #         instruction[1] = '7'
-            
+             
         #     if self.aruLocation['top']:
         #         instruction[3] = '-7'
         #     elif self.aruLocation['bottom']:
@@ -225,8 +229,6 @@ class MinimalSubscriber(Node):
 
         #     ins = ' '.join(instruction)
         #     self.sendRequest(instruction)
-
-
         if len(aru_id) != 0:
             if self.alignLock:
                 align = True
@@ -235,25 +237,58 @@ class MinimalSubscriber(Node):
             x = False
             y = False
             print("Target:", self.aruTarget)
-            if self.aruTarget == 2 and len(aru_id) > 1 and self.aruLock:
-                self.aruBeLock('', False)
+            aru_distance[index] = aru_distance[index] * 5
             for ids in aru_id:
+                print(aru_x[index], aru_y[index], aru_distance)
                 side = False
-                if ids[0] != 0: 
-                    print(ids,aru_distance[index])
-                else:
-                    print(aru_distance[index] * 1.5)
+                print(aru_distance[index])
                 if ids[0] in self.aruSide:
                     side = True
+                if self.aruTarget == 3 and (ids[0] == 9 or ids[0] == 10):
+                    if ids[0] == 9: # right
+                        if aru_distance[index] < 140:
+                            self.sendRequest("cw -10")
+                    elif ids[0] == 10: #left
+                        if aru_distance[index] < 140:
+                            self.sendRequest("cw 10")
+                if ids[0] == 14 and len(aru_id) == 1:
+                    if not self.aruAlignSwitch:
+                        self.aruBeLock('forward', False)
+                    if self.aruTarget == 14 :
+                        pass
+                    else:
+                        self.aruTempTarget = self.aruTarget
+                    self.aruTarget = 14
+                    self.aruAligning = True
+                elif self.aruAligning == True:
+                    _aru_id = np.array(aru_id).flatten()
+                    print(_aru_id,self.aruTempTarget)
+                    if self.aruTempTarget in _aru_id:
+                        print(self.aruTempTarget)
+                        self.aruTarget = self.aruTempTarget
+                        self.aruAligning = False
                 if ids[0] != self.aruTarget:
+                    print("not turn")
                     continue
                 self.locationFixed = False
                 if ids[0] == self.aruTarget:
-                    self.aruLocation['id'] = ids[0]
+                    self.aruLocation['id' ] = ids[0]
                     self.locationFixed = True
                 if ids[0] in self.aruFar and self.aruTarget == ids[0]:
                     if aru_distance[index] < 200:
                         self.aruBeLock('', False)
+                elif ids[0] not in self.aruFar:
+                    self.aruBeLock('', False)
+                if ids[0] == 2 and self.aruTarget == 2:
+                    self.aruBound = [100,400]
+                elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'go':
+                    self.aruBound = [110,130]
+                elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'back':
+                    self.aruBound = [120,150]
+                else:
+                    self.aruBound = [100, 200]
+
+                print(self.aruLock, self.aruLockCode)
                 # if ids[0] == 0 and self.aruTarget == 0:
                 #     print("id[0] processing...", self.aruLock)
                 #     aru_distance[index] = aru_distance[index] * 1.5
@@ -272,8 +307,6 @@ class MinimalSubscriber(Node):
 
                 # print("X:",aru_x[index])
                 # print("Y:", aru_y[index])
-                if ids[0] == 0:
-                    aru_distance[index] = aru_distance[index] * 3
                 if aru_distance[index] < self.aruBound[0]:
                     # self.sendRequest("rc 0 -10 0 0") # x z y raw
                     self.aruBeLock('back', True)
@@ -281,39 +314,42 @@ class MinimalSubscriber(Node):
                 elif aru_distance[index] > self.aruBound[0] and self.aruLock == True:
                     self.aruBeLock('', False)
                 if aru_distance[index] > self.aruBound[1]:
-                    if aru_x[index] < -0.01 and not side:
-                        instruction[1] = '-11'
+                    if aru_x[index] < -0.06 and not side:
+                        instruction[1] = '-18'
                         instruction[2] = '0'
                         if self.locationFixed:
                             self.aruLocation['left'] = True
                             self.aruLocation['right'] = False
-
-                    elif aru_x[index] > 0.53 and not side:
-                        instruction[1] = '11'
+                    elif aru_x[index] > 10:
+                        pass
+                    elif aru_x[index] > 0.4 and not side:
+                        print("qua left")
+                        instruction[1] = '18'
                         instruction[2] = '0'
                         if self.locationFixed:
                             self.aruLocation['left'] = False
                             self.aruLocation['right'] = True
                     else:
                         if aru_distance[index] < 150:
-                            instruction[1] = '5'
-                            instruction[2] = '10'
+                            instruction[1] = '0'
+                            instruction[2] = '25'
                             if self.locationFixed:
                                 self.aruLocation['left'] = False
                                 self.aruLocation['right'] = False
                         else:
-                            instruction[2] = '10'
+                            instruction[2] = '25'
                             
                         
-                    
-                    if aru_y[index] < -0.4 and aru_distance[index] < 150:
+                    print("y:",aru_y[index] < - 0.7)
+                    if aru_y[index] < -0.7 and aru_distance[index] < 670 and not self.aruAligning:
+                        print("up....")
                         instruction[3] = '18'
                         instruction[2] = '0'
                         if self.locationFixed:
                             self.aruLocation['bottom'] = True
                             self.aruLocation['top'] = False
 
-                    elif aru_y[index] > 0.14 and aru_distance[index] < 150:
+                    elif aru_y[index] > 0.14 and aru_distance[index] < 670 and not self.aruAligning:
                         instruction[3] = '-10'
                         instruction[2] = '0'
                         if self.locationFixed:
@@ -321,7 +357,7 @@ class MinimalSubscriber(Node):
                             self.aruLocation['top'] = True
                     else:
                         instruction[3] = '-5'
-                        instruction[2] = '10'
+                        instruction[2] = '20'
                         if self.locationFixed:
 
                             self.aruLocation['bottom'] = False
@@ -356,7 +392,7 @@ class MinimalSubscriber(Node):
 
                             self.aruLocation['left'] = True
                             self.aruLocation['right'] = False
-                    elif aru_x[index] > 0.36 and not side:
+                    elif aru_x[index] > 0.3 and not side:
                         print("qua right")
                         instruction[1] = '13'
                         if self.locationFixed:
@@ -369,13 +405,17 @@ class MinimalSubscriber(Node):
                         self.aruLocation['left'] = False
                         self.aruLocation['right'] = False
 
-                    if aru_y[index] < -0.33:
+                    if aru_y[index] < -0.33 and not self.aruAligning:
+                        print("y low")
+
                         instruction[3] = '13'
                         if self.locationFixed:
 
                             self.aruLocation['bottom'] = True
                             self.aruLocation['top'] = False
-                    elif aru_y[index] > -0.01:
+                    elif aru_y[index] > -0.01 and not self.aruAligning:
+                        print("y high")
+                        
                         instruction[3] = '-13'
                         if self.locationFixed:
 
@@ -395,65 +435,84 @@ class MinimalSubscriber(Node):
                         self.sendRequest(ins)
                 # print(ids[0], aru_distance[index])
                 if align:
-                    if ids[0] == 0 and self.aruTarget == 0:
+                    if ids[0] == 0 and self.aruTarget == 0 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("cw -20")
-                        instruction[3] = '13'
-                        self.aruTarget = 1
-                        if self.locationFixed: 
-                            self.aruLocation['bottom'] = True
-                            self.aruLocation['top'] = False
-                    elif aru_y[index] > -0.01:
-                        instruction[3] = '-13'
-                        self.scannedArucoCode.append(1)
+                            self.aruTarget = 1
+                            self.aruTempTarget = 1
+                            self.sendRequest("cw -50")
+                        
 
                             
 
-                    elif ids[0] == 1 and self.aruTarget == 1:
+                    elif ids[0] == 1 and self.aruTarget == 1 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("cw -20")
+                            self.sendRequest("cw 50")
                             self.aruTarget = 2
+                            self.aruTempTarget = 2
+                            self.aruBeLock("forward", True)
                     
-                    elif ids[0] == 2 and self.aruTarget == 2:
+                    elif ids[0] == 2 and self.aruTarget == 2 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("cw 20")
+                            # self.sendRequest("cw 30")
+                            self.sendRequest("cw 40")
 
                             self.aruTarget = 3
+                            self.aruTempTarget = 3
+                            self.aruBeLock("forward", True)
+
                             self.aruGoMode = 'go'
                     elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("cw -45")
+                            self.sendRequest("cw -90")
                             self.aruTarget = 4
+                            self.aruTempTarget = 4
+                            self.aruBeLock("forward", True)
 
-                    elif ids[0] == 4 and self.aruTarget == 4:
+
+                    elif ids[0] == 4 and self.aruTarget == 4 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
                             self.sendRequest("cw 180")
                             self.aruTarget = 3
+                            self.aruTempTarget = 3
                             self.aruGoMode = 'back'
                     elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'back':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("cw 45")
+                            self.sendRequest("cw 90")
                             self.aruTarget = 5
+                            self.aruTempTarget = 5
                     elif ids[0] == 5 and self.aruTarget == 5 and self.aruGoMode == 'back':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("cw -20")
+                            self.sendRequest("cw -50")
                             self.aruTarget = 6
+                            self.aruTempTarget = 6
 
                     elif ids[0] == 6 and self.aruTarget == 6 and self.aruGoMode == 'back':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("cw -20")
-                            self.aruTarget = 6
+                            self.sendRequest("cw -30")
+                            self.aruTarget = 7
+                            self.aruTempTarget = 7
 
                     elif ids[0] == 7 and self.aruTarget == 7 and self.aruGoMode == 'back':
+                        if aru_distance[index] < (self.aruBound[1] + 20):
+                            self.sendRequest("cw 40")
+                            self.aruTarget = 8
+                            self.aruTempTarget = 8
+                    elif ids[0] == 8 and self.aruTarget == 8 and self.aruGoMode == 'back':
                         if aru_distance[index] < self.aruBound[1]:
                             self.sendRequest("land")
-                            self.aruTarget = 5
-
+                            self.aruTarget = 8
+                            self.aruTempTarget = 8
+                    elif ids[0] == 14 and self.aruTarget == 14:
+                        if aru_distance[index] < self.aruBound[1]:
+                            self.aruAlignSwitch = True
+                            self.aruBeLock('forward', True)
                     x = False
                     y = False
                 
                 index = index + 1
         elif self.aruTarget in self.aruFar and not self.aruLock:
+            self.aruBeLock("forward", True)
+        elif self.aruAligning == True:
             self.aruBeLock("forward", True)
         if self.stop == False and self.mode == 'normal':
             if self.process_this_frame:

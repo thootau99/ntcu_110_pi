@@ -10,7 +10,7 @@ from tello_msgs.srv import TelloAction
 from rclpy.node import Node
 from std_msgs.msg import String
 
-SERVERIP = 'https://ntculastview-o7eqsjirea-de.a.run.app'    # local host, just for testing
+SERVERIP = 'http://35.201.162.120:5000'    # local host, just for testing
 
 
 class Publisher(Node):

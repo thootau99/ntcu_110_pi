@@ -21,16 +21,16 @@ def aru(frame):
 
     distortion_coeff = np.array( [[-5.60512132e-01,  5.57573002e+00, -8.93361527e-02, -1.13456082e-03,
  -4.28452394e+01]] )
-
     try:
-        corners, ids, rejectedImgPoints = aruco.detectMarkers(frame, dictionary, parameters=parameters)
-
-        aruco.drawDetectedMarkers(frame, corners, ids, (0,255,255))
         x = []
         y = []
         z = []
         d = []
         yaw = []
+        corners, ids, rejectedImgPoints = aruco.detectMarkers(frame, dictionary, parameters=parameters)
+
+        aruco.drawDetectedMarkers(frame, corners, ids, (0,255,255))
+        
         if len(corners) > 0:
             for i, corner in enumerate(corners):
                 # rvec -> rotation vector, tvec -> translation vector
