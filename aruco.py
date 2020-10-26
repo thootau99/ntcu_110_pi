@@ -12,6 +12,16 @@ parameters.cornerRefinementMethod = aruco.CORNER_REFINE_CONTOUR
 cc = cv2.VideoWriter_fourcc(*'XVID')
 out = cv2.VideoWriter('output.avi', cc, 20.0, (480, 360))
 
+def drawCenter(frame, corners, w, h):
+    if self.TargetID not in seen_id_list:
+        pass
+    else:
+        cx = int((corners[ind][0][0][0]+corners[ind][0][1][0]+corners[ind][0][2][0]+corners[ind][0][3][0])/4)
+        cy = int((corners[ind][0][0][1]+corners[ind][0][1][1]+corners[ind][0][2][1]+corners[ind][0][3][1])/4)
+        cv2.line(frame, (int(w/2), int(h/2)), (cx, cy), (0,255,255), 3)
+       
+    return frame
+
 def aru(frame):
     cnt=0
     marker_length = 0.1
