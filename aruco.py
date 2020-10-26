@@ -1,5 +1,5 @@
 import numpy as np
-import cv2 
+import cv2
 import sys
 import math
 aruco = cv2.aruco #arucoライブラリ
@@ -19,10 +19,11 @@ def drawCenter(frame, corners, w, h):
         cx = int((corners[ind][0][0][0]+corners[ind][0][1][0]+corners[ind][0][2][0]+corners[ind][0][3][0])/4)
         cy = int((corners[ind][0][0][1]+corners[ind][0][1][1]+corners[ind][0][2][1]+corners[ind][0][3][1])/4)
         cv2.line(frame, (int(w/2), int(h/2)), (cx, cy), (0,255,255), 3)
-       
+
     return frame
 
 def aru(frame):
+    h, w = frame.shape[:2]
     cnt=0
     marker_length = 0.1
     camera_matrix = np.array([[974.9035727,    0,         173.4483866, ],
@@ -40,7 +41,8 @@ def aru(frame):
         corners, ids, rejectedImgPoints = aruco.detectMarkers(frame, dictionary, parameters=parameters)
 
         aruco.drawDetectedMarkers(frame, corners, ids, (0,255,255))
-        
+        frame = drawCenter(frame, corners, h, w)
+
         if len(corners) > 0:
             for i, corner in enumerate(corners):
                 # rvec -> rotation vector, tvec -> translation vector
@@ -64,7 +66,7 @@ def aru(frame):
                 d.append(tvec[2] * 24)
                 yaw.append(euler_angle[0])
                 # print("%.1f cm -- %.0f deg" % ((tvec[2] * 2.5), (rvec[2] / math.pi * 180)))
-                
+
                 draw_pole_length = marker_length/2 # 現実での長さ[m]
                 aruco.drawAxis(frame, camera_matrix, distortion_coeff, rvec, tvec, draw_pole_length)
 
