@@ -35,7 +35,7 @@ def aru(frame):
             for i, corner in enumerate(corners):
                 # rvec -> rotation vector, tvec -> translation vector
                 rvec, tvec, _ = aruco.estimatePoseSingleMarkers(corner, marker_length, camera_matrix, distortion_coeff)
-
+                
                 tvec = np.squeeze(tvec)
                 rvec = np.squeeze(rvec)
                 rvec_matrix = cv2.Rodrigues(rvec)
@@ -53,10 +53,12 @@ def aru(frame):
                 z.append(tvec[2])
                 d.append(tvec[2] * 24)
                 yaw.append(euler_angle[0])
+                print(euler_angle)
                 # print("%.1f cm -- %.0f deg" % ((tvec[2] * 2.5), (rvec[2] / math.pi * 180)))
                 
                 draw_pole_length = marker_length/2 # 現実での長さ[m]
                 aruco.drawAxis(frame, camera_matrix, distortion_coeff, rvec, tvec, draw_pole_length)
+                
 
         cv2.imshow('facccc', frame)
         out.write(frame)
