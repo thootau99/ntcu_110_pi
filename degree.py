@@ -1,4 +1,4 @@
-# https://towardsdatascience.com/finding-driving-lane-line-live-with-opencv-f17c266f15db
+    # https://towardsdatascience.com/finding-driving-lane-line-live-with-opencv-f17c266f15db
 # Testing edge detection for maze
 import cv2
 import numpy as np
@@ -68,11 +68,8 @@ def imageDegreeCheck(image, it):
 
     # run Hough on edge detected image
     lines = cv2.HoughLinesP(masked_edges, rho, theta, threshold, np.array([]),min_line_length, max_line_gap)
-    angle_av = 0
-    left = False
     left_lines = []
     right_lines = []
-    c = 0
     for line in lines:
             for x1,y1,x2,y2 in line:
 
@@ -87,8 +84,6 @@ def imageDegreeCheck(image, it):
                     else:
                         left_lines.append(line)
                         # intangle = abs(intangle - 180)
-                    c = c + 1
-                    angle_av = angle_av + intangle
                     # cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
 
                 # if (angle < 145 and angle > 100) or (intangle < 50 and intangle > 28):
@@ -102,9 +97,6 @@ def imageDegreeCheck(image, it):
                 #     right_count = right_count + 1
                 #     cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
                 #     cv2.putText(line_image, str(c), (x1, y1-20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1, cv2.LINE_AA, True)
-    if it:
-        flip = cv2.flip(image, 1)
-        cv2.imwrite("lanes_detected_flip.jpg", flip)
 
     clean_lines(left_lines, 0.1)
     clean_lines(right_lines, 0.1)
@@ -118,35 +110,30 @@ def imageDegreeCheck(image, it):
 
     leftLineCenter, rightLineCenter = int(left_fun(image.shape[0]/2)),int(right_fun(image.shape[0]/2))
     center = image.shape[0] / 2
-    print(leftLineCenter, rightLineCenter, center)
     lineav = (leftLineCenter + rightLineCenter) / 2
+    leftDegree = math.atan2(left_vtx[1][0]-left_vtx[0][0], left_vtx[1][1] - left_vtx[0][1]) * 180 / 3.14
+    rightDegree = math.atan2(right_vtx[1][0]-right_vtx[0][0], right_vtx[1][1] - right_vtx[0][1]) * 180 / 3.14
+    degree = abs(abs(leftDegree) - abs(rightDegree))
+    result = ""
     if leftLineCenter - lineav < 100 and rightLineCenter - lineav < 100:
         pass
     elif leftLineCenter > center:
         print("qua left, turn right")
+        result = "cw "+ str(int(abs(degree - 10)))
     else:
         print("qua right turn left")
-    cv2.line(line_image, left_vtx[0], left_vtx[1], (255,0,0), 10)
-    print("left", math.atan2(left_vtx[1][0]-left_vtx[0][0], left_vtx[1][1] - left_vtx[0][1]) * 180 / 3.14)
-    cv2.line(line_image, right_vtx[0], right_vtx[1], (255,0,0), 10)
-    print("right",math.atan2(right_vtx[1][0]-right_vtx[0][0], right_vtx[1][1] - right_vtx[0][1]) * 180 / 3.14)
-
-    # print(math.atan2(x2-x1, y2-y) * 180 / 3.14)
-
-    if c == 0:
-        angle_av = 0
-    else:
-        angle_av = angle_av / c
+        result = "cw "+ str(-int(abs(degree - 10)))
+    cv2.line(image, left_vtx[0], left_vtx[1], (255,0,0), 10)
+    cv2.line(image, right_vtx[0], right_vtx[1], (255,0,0), 10)
     # if left_count == 0:
     #     angle_av = right_angle_av / right_count
     # else:
     #     angle_av = left_angle_av / left_count
     #     left = True
     lines_edges = cv2.addWeighted(image, 0.8, line_image, 1, 0)
-
     # if not left:
     #     print(angle_av-(angle_av + flipav)/2)
     # else:
     #     print(abs(angle_av-(angle_av + flipav)/2))
     # draw the line on the original image
-    #return lines_edges
+    return image, result
