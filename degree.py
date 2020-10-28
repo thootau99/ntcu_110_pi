@@ -70,6 +70,8 @@ def imageDegreeCheck(image, it):
     lines = cv2.HoughLinesP(masked_edges, rho, theta, threshold, np.array([]),min_line_length, max_line_gap)
     left_lines = []
     right_lines = []
+    if lines == None:
+        return image,0
     for line in lines:
             for x1,y1,x2,y2 in line:
 

@@ -22,6 +22,8 @@ from cv_bridge import CvBridge
 import detect_mask_video
 from fix import check
 from aruco import aru
+from degree import imageDegreeCheck
+from pprint import pprint
 print('aaa')
 
 # Initialize some variables
@@ -64,6 +66,8 @@ class MinimalSubscriber(Node):
         self.CX = 480   # 大約在畫面中間的 X 座標
         self.CY = 360   # 大約在畫面中間的 Y 座標
         self.xulyframe = 0
+        self.future = 0
+        self.action_future = False
         self.face_locations = [] # 存解析輸入圖片後人臉的位置
         self.face_encodings = [] # 存解析輸入圖片後人臉的 code
         self.face_names = []     # 存解析輸入圖片後人臉的 name
@@ -125,6 +129,8 @@ class MinimalSubscriber(Node):
                 os.remove("./dataset_img/%s.jpg"%item)
                 print("removed dataset_img/%s.jpg"%item)
 
+        self.future = self.sendRequest('cw 20')
+
     def userCommandCallBack(self, s):
         print(s.data)
         if s.data == 'stop':
@@ -147,7 +153,10 @@ class MinimalSubscriber(Node):
         if type(s) != str:
             s = ' '.join(s)
         self.telloCliRequest.cmd = s
-        self.future = self.telloCli.call_async(self.telloCliRequest)
+        future = self.telloCli.call_async(self.telloCliRequest)
+        return future
+
+
 
     def setFollowName(self, s):
         self.followName = s
@@ -200,8 +209,23 @@ class MinimalSubscriber(Node):
         aru_deg = []
         align = False #TODO: test
         index = 0
-        aru_x,aru_y,aru_z,aru_distance,aru_deg, aru_id = aru(small_frame)
+        aru_x,aru_y,aru_z,aru_distance,aru_deg, aru_id,small_frame = aru(small_frame)
+        cv2.startWindowThread()
+        cv2.namedWindow("preview")
+        cv2.imshow("preview", small_frame)
+        cv2.waitKey(1)
         self.aruAlignSwitch = False
+        if not self.future.done():
+            return
+        if self.action_future:
+            small_frame, result_edge = imageDegreeCheck(small_frame, True)
+            print(result_edge)
+            self.sendRequest(result_edge)
+            if self.aruTarget in self.aruFar:
+                print("far target")
+                self.aruBeLock("forward", True)
+            self.action_future = False
+
         if self.aruLock:
             if self.aruLockCode == 'back':
                 self.sendRequest('rc 0 -10 0 0')
@@ -240,7 +264,7 @@ class MinimalSubscriber(Node):
                 pass
             for ids in aru_id:
                 side = False
-                print("ids[0]=", ids[0], aru_distance[index])
+                print(aru_id)
                 if ids[0] in self.aruSide:
                     side = True
                 if self.aruTarget == 3 and (ids[0] == 9 or ids[0] == 10):
@@ -414,7 +438,6 @@ class MinimalSubscriber(Node):
 
                         instruction[3] = '13'
                         if self.locationFixed:
-
                             self.aruLocation['bottom'] = True
                             self.aruLocation['top'] = False
                     elif aru_y[index] > -0.01 and not self.aruAligning:
@@ -443,64 +466,88 @@ class MinimalSubscriber(Node):
                         if aru_distance[index] < self.aruBound[1]:
                             self.aruTarget = 1
                             self.aruTempTarget = 1
-                            self.sendRequest("cw -50")
+                            self.future = self.sendRequest("cw -50")
+                            self.action_future = True
+                            self.aruGoMode = 'go'
+
                         
 
                             
 
                     elif ids[0] == 1 and self.aruTarget == 1 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("cw 50")
                             self.aruTarget = 2
                             self.aruTempTarget = 2
-                            self.aruBeLock("forward", True)
+                            self.future = self.sendRequest("cw 50")
+                            self.action_future = True
+
+                            self.aruGoMode = 'go'
+
                     
                     elif ids[0] == 2 and self.aruTarget == 2 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
                             # self.sendRequest("cw 30")
-                            self.sendRequest("cw 40")
 
                             self.aruTarget = 3
                             self.aruTempTarget = 3
-                            self.aruBeLock("forward", True)
+                            self.future = self.sendRequest("cw 40")
+                            self.action_future = True
+
+
 
                             self.aruGoMode = 'go'
                     elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("cw -90")
                             self.aruTarget = 4
                             self.aruTempTarget = 4
-                            self.aruBeLock("forward", True)
+                            self.future = self.sendRequest("cw -90")
+                            self.action_future = True
+
 
 
                     elif ids[0] == 4 and self.aruTarget == 4 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("cw 180")
                             self.aruTarget = 3
                             self.aruTempTarget = 3
                             self.aruGoMode = 'back'
+                            self.future = self.sendRequest("cw 180")
+                            self.action_future = True
+
+
                     elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'back':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("cw 90")
                             self.aruTarget = 5
                             self.aruTempTarget = 5
+                            self.future = self.sendRequest("cw 90")
+                            self.action_future = True
+
+
                     elif ids[0] == 5 and self.aruTarget == 5 and self.aruGoMode == 'back':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("cw -50")
                             self.aruTarget = 6
                             self.aruTempTarget = 6
+                            self.future = self.sendRequest("cw -50")
+                            self.action_future = True
+
+
 
                     elif ids[0] == 6 and self.aruTarget == 6 and self.aruGoMode == 'back':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.sendRequest("cw -30")
                             self.aruTarget = 7
                             self.aruTempTarget = 7
+                            self.future = self.sendRequest("cw -30")
+                            self.action_future = True
+
+
 
                     elif ids[0] == 7 and self.aruTarget == 7 and self.aruGoMode == 'back':
                         if aru_distance[index] < (self.aruBound[1] + 20):
-                            self.sendRequest("cw 40")
                             self.aruTarget = 8
                             self.aruTempTarget = 8
+                            self.future = self.sendRequest("cw 40")
+                            self.action_future = True
+
+
                     elif ids[0] == 8 and self.aruTarget == 8 and self.aruGoMode == 'back':
                         if aru_distance[index] < self.aruBound[1]:
                             self.sendRequest("land")

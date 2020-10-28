@@ -72,7 +72,6 @@ def aru(frame):
                 aruco.drawAxis(frame, camera_matrix, distortion_coeff, rvec, tvec, draw_pole_length)
                 
 
-        cv2.imshow('facccc', frame)
         out.write(frame)
         cnt+=1
 
@@ -89,7 +88,7 @@ def aru(frame):
                 d = []
         except:
             pass
-        return x, y, z, d, yaw,ids
+        return x, y, z, d, yaw,ids,frame
 
     if __name__ == "__main__":
         main()
