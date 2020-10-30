@@ -70,8 +70,11 @@ def imageDegreeCheck(image, it):
     lines = cv2.HoughLinesP(masked_edges, rho, theta, threshold, np.array([]),min_line_length, max_line_gap)
     left_lines = []
     right_lines = []
-    if lines == None:
-        return image,0
+    try:
+        if lines == None:
+            return image,0
+    except:
+        pass
     for line in lines:
             for x1,y1,x2,y2 in line:
 
@@ -106,33 +109,100 @@ def imageDegreeCheck(image, it):
     left_points = left_points + [(x2, y2) for line in left_lines for x1,y1,x2,y2 in line]
     right_points = [(x1, y1) for line in right_lines for x1,y1,x2,y2 in line]
     right_points = right_points + [(x2, y2) for line in right_lines for x1,y1,x2,y2 in line]
-
-    left_vtx, left_fun = calc_lane_vertices(left_points, 325, image.shape[0])
-    right_vtx, right_fun = calc_lane_vertices(right_points, 325, image.shape[0])
+    
+    try:
+        left_vtx, left_fun = calc_lane_vertices(left_points, 100, image.shape[0])
+    except :
+        print("can't find line left")
+        return image, "cw -3"
+    try:
+        right_vtx, right_fun = calc_lane_vertices(right_points, 100, image.shape[0])
+    except :
+        print("can't find line right")
+        return image, "rc -10 0 0 0"
+    
 
     leftLineCenter, rightLineCenter = int(left_fun(image.shape[0]/2)),int(right_fun(image.shape[0]/2))
     center = image.shape[0] / 2
+    print(leftLineCenter, rightLineCenter,center)
     lineav = (leftLineCenter + rightLineCenter) / 2
     leftDegree = math.atan2(left_vtx[1][0]-left_vtx[0][0], left_vtx[1][1] - left_vtx[0][1]) * 180 / 3.14
     rightDegree = math.atan2(right_vtx[1][0]-right_vtx[0][0], right_vtx[1][1] - right_vtx[0][1]) * 180 / 3.14
+    print(leftDegree, rightDegree)
+    # print(int(abs(abs(leftDegree) - rightDegree)))
+    # print( abs(int(abs(leftDegree)) - int(abs(rightDegree))), abs(int(abs(rightDegree)) - int(abs(leftDegree))) )
     degree = abs(abs(leftDegree) - abs(rightDegree))
-    result = ""
+    result = "success"
+    leftcentered = False
+    rightcentered = False
     if leftLineCenter - lineav < 100 and rightLineCenter - lineav < 100:
-        pass
-    elif leftLineCenter > center:
-        print("qua left, turn right")
-        result = "cw "+ str(int(abs(degree - 10)))
-    else:
-        print("qua right turn left")
-        result = "cw "+ str(-int(abs(degree - 10)))
-    cv2.line(image, left_vtx[0], left_vtx[1], (255,0,0), 10)
-    cv2.line(image, right_vtx[0], right_vtx[1], (255,0,0), 10)
+        result = "success"
+
+    
+    if abs(int(abs(leftDegree)) - int(abs(rightDegree))) >= 5:
+        if abs(abs(int(leftDegree)) - 40) > 5:
+            print("qua right turn left")
+            result = "rc 10 0 0 0"
+            return image, result
+        else:
+            result = "rc 0 0 0 0"
+            leftcentered = True
+
+        if abs(abs(int(rightDegree)) - 45) > 3:
+            print("qua left turn right")
+            result = "rc -10 0 0 0"
+            return image, result
+        else:
+            result = "rc 0 0 0 0"
+            return image, result
+    elif abs(int(abs(leftDegree)) - int(abs(rightDegree))) < 3:
+        # result = "cw 0"
+        if leftLineCenter > center:
+            result = "cw 3"
+        else:
+            result = "cw 0"
+        # if abs(abs(int(leftDegree)) - 40) > 5:
+        #     print("qua right turn left")
+        #     result = "cw 3"
+        #     return image, result
+        # else:
+        #     result = "rc 0 0 0 0"
+        #     leftcentered = True
+
+        # if abs(int(rightDegree)) - 45 > 5:
+        #     print("qua left turn right")
+        #     result = "rc -10 0 0 0"
+        #     return image, result
+        # else:
+        #     result = "rc 0 0 0 0"
+        #     return image, result
+            # result = "cw "+ str(3)
+        # result = "cw "+ str(int(abs(degree - 10)))
+    # if abs(int(abs(rightDegree)) - int(abs(leftDegree))) > 5:
+    #     print("qua right turn left")
+    #     result = "rc- 10 0 0 0"
+    #     return image, result
+    #     # result = "cw "+ str(-3)
+    # else:
+    #     rightcentered = True
+
+    if leftcentered and rightcentered:
+        result = "123213"
+        return image, result
+        
+        # result = "cw "+ str(-int(abs(degree - 10)))
+    # cv2.line(image, left_vtx[0], left_vtx[1], (255,0,0), 10)
+    # cv2.line(image, right_vtx[0], right_vtx[1], (255,0,0), 10)
     # if left_count == 0:
     #     angle_av = right_angle_av / right_count
     # else:
     #     angle_av = left_angle_av / left_count
     #     left = True
     lines_edges = cv2.addWeighted(image, 0.8, line_image, 1, 0)
+    # cv2.startWindowThread()
+    # cv2.namedWindow("ppp")
+    # cv2.imshow("ppp", image)
+    # cv2.waitKey(1)
     # if not left:
     #     print(angle_av-(angle_av + flipav)/2)
     # else:

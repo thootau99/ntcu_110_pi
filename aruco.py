@@ -32,6 +32,7 @@ def aru(frame):
 
     distortion_coeff = np.array( [[-5.60512132e-01,  5.57573002e+00, -8.93361527e-02, -1.13456082e-03,
  -4.28452394e+01]] )
+    ids=[]
     try:
         x = []
         y = []
@@ -41,7 +42,6 @@ def aru(frame):
         corners, ids, rejectedImgPoints = aruco.detectMarkers(frame, dictionary, parameters=parameters)
 
         aruco.drawDetectedMarkers(frame, corners, ids, (0,255,255))
-        frame = drawCenter(frame, corners, h, w)
 
         if len(corners) > 0:
             for i, corner in enumerate(corners):
@@ -65,7 +65,6 @@ def aru(frame):
                 z.append(tvec[2])
                 d.append(tvec[2] * 24)
                 yaw.append(euler_angle[0])
-                print(euler_angle)
                 # print("%.1f cm -- %.0f deg" % ((tvec[2] * 2.5), (rvec[2] / math.pi * 180)))
 
                 draw_pole_length = marker_length/2 # 現実での長さ[m]
@@ -88,7 +87,10 @@ def aru(frame):
                 d = []
         except:
             pass
-        return x, y, z, d, yaw,ids,frame
-
+        try:
+            return x, y, z, d, yaw,ids,frame
+        except:
+            return [], [],[], [], [], [], frame
+ 
     if __name__ == "__main__":
         main()

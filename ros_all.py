@@ -19,12 +19,11 @@ from threading import Thread
 from tello_msgs.srv import TelloAction
 from cv_bridge import CvBridge
 
-import detect_mask_video
 from fix import check
 from aruco import aru
 from degree import imageDegreeCheck
 from pprint import pprint
-print('aaa')
+# print('aaa')
 
 # Initialize some variables
 
@@ -47,7 +46,7 @@ class MinimalSubscriber(Node):
             10)
         self.publisher_ = self.create_publisher(msg.Image, 'cvImage', 10) # 加入 ROS-publisher, 發出處理過的image
         self.publisher_facename = self.create_publisher(String, 'facename', 10)
-        
+        self.action_processing = False
         self.subscription  # prevent unused variable warning
         self.telloCli = self.create_client(TelloAction, 'tello_action') #TODO: 待完成，call ros2 service
         self.telloCliRequest = TelloAction.Request()
@@ -67,6 +66,7 @@ class MinimalSubscriber(Node):
         self.CY = 360   # 大約在畫面中間的 Y 座標
         self.xulyframe = 0
         self.future = 0
+        self.successconb = False
         self.action_future = False
         self.face_locations = [] # 存解析輸入圖片後人臉的位置
         self.face_encodings = [] # 存解析輸入圖片後人臉的 code
@@ -79,15 +79,18 @@ class MinimalSubscriber(Node):
         self.unknownTakeAgainName = ''
         self.unknownTakeAgainCount = 0
         self.executeArcode = False
+        self.landautien = True
         self.known_face_encodings = [] # 存解析 database 中的人臉
         self.known_face_names = [] # 存解析 database 中的人名
         self.aruLock = False
+        self.keep = False
+        self.batteryFuture = False
         self.aruAlignSwitch = False
         self.aruBound = [100, 130]
         self.dark = False # 看圖有沒有過黑
         self.read_path('./dataset_img') # 到 /dataset_img 讀資料
         self.followName = 'uahuynh'        
-        self.aruTarget = 0
+        self.aruTarget = 2
         self.aruSide = []
         self.aruFar = [0,2,3,4,5,6,7,8]
         self.aruTempTarget = 0
@@ -100,7 +103,7 @@ class MinimalSubscriber(Node):
         self.traceLocationAruco = False
         self.scannedArucoCode = []
         
-        self.mode = 'mask'
+        self.mode = ''
         l = locals()
                     # if abs(aru_deg[index][0]) > 150 and abs(aru_deg[index][0]) < 168:
                     #     aru_deg[index][0] = abs(aru_deg[index][0])
@@ -129,7 +132,7 @@ class MinimalSubscriber(Node):
                 os.remove("./dataset_img/%s.jpg"%item)
                 print("removed dataset_img/%s.jpg"%item)
 
-        self.future = self.sendRequest('cw 20')
+        self.future = self.sendRequest('rc 0 0 0 0')
 
     def userCommandCallBack(self, s):
         print(s.data)
@@ -148,16 +151,30 @@ class MinimalSubscriber(Node):
         else:
             self.followName = s.data
             print(self.followName)
-
-    def sendRequest(self, s):
-        if type(s) != str:
-            s = ' '.join(s)
-        self.telloCliRequest.cmd = s
-        future = self.telloCli.call_async(self.telloCliRequest)
-        return future
-
-
-
+    # def battery(self):
+    #     if self.batteryFuture == False:
+    #         self.batteryFuture = await self.sendRequest("battery?")
+    #         return
+    #     if ():
+    #         print(f.result())
+    def sendRequest(self, s, normal=True):
+        if not self.action_processing:
+            if type(s) != str:
+                s = ' '.join(s)
+            self.telloCliRequest.cmd = s
+            future = self.telloCli.call_async(self.telloCliRequest)
+            return future
+        else:
+            if not normal:
+                if type(s) != str:
+                    s = ' '.join(s)
+                self.telloCliRequest.cmd = s
+                future = self.telloCli.call_async(self.telloCliRequest)
+                self.action_processing = False
+                return future
+            else:
+                return
+        
     def setFollowName(self, s):
         self.followName = s
 
@@ -180,7 +197,6 @@ class MinimalSubscriber(Node):
         except CvBridgeError as e:
             print(e)
         small_frame = cv2.resize(cv_image, (0, 0), fx=0.5, fy=0.5) # resize frame
-
         # gray_img = cv2.cvtColor(small_frame,cv2.COLOR_BGR2GRAY); # 轉灰階來辨別圖片有沒有過黑
         
         # r,c = gray_img.shape[:2] 
@@ -218,38 +234,43 @@ class MinimalSubscriber(Node):
         if not self.future.done():
             return
         if self.action_future:
-            small_frame, result_edge = imageDegreeCheck(small_frame, True)
-            print(result_edge)
-            self.sendRequest(result_edge)
-            if self.aruTarget in self.aruFar:
-                print("far target")
-                self.aruBeLock("forward", True)
-            self.action_future = False
+            self.successconb = False
+            if not self.successconb:
+                _, result_edge = imageDegreeCheck(cv_image, True)
+                if result_edge == 0:
+                    print('conb failed')
+                    return
+                else:
+                    self.successconb = True
+                    if result_edge == "" or result_edge == "cw 0":
+                        self.keep = False
+                        self.action_future = False
+                        self.successconb = False
+                        if self.aruTarget in self.aruFar:
+                            print("far target")
+                            self.aruBeLock("forward", True)
+                    else:
+                        self.future = self.sendRequest(result_edge, False)
+                        # self.keep = False
+                        # self.action_future = False
+                        # self.successconb = False
+                        # if self.aruTarget in self.aruFar:
+                        #     print("far target")
+                        #     self.aruBeLock("forward", True)
+                        return
+                    print(result_edge)
+        
+        # if self.landautien:
+        #     self.action_future = True
+        #     self.landautien = False
 
+            
         if self.aruLock:
             if self.aruLockCode == 'back':
                 self.sendRequest('rc 0 -10 0 0')
             elif self.aruLockCode == 'forward':
                     self.sendRequest('rc 0 22 0 0')
-        # if self.aruTarget == 3 and len(aru_id) == 0:
-        #     self.sendRequest('rc -5 0 0 0')
-        
-        # if self.aruLocation['id'] == self.aruTarget and len(aru_id) == 0 and self.locationFixed:
 
-        #     instruction = ['rc', '0', '-10', '0', '0']
-
-        #     if self.aruLocation['left']:
-        #         instruction[1] = '-7'
-        #     elif self.aruLocation['right']:
-        #         instruction[1] = '7'
-             
-        #     if self.aruLocation['top']:
-        #         instruction[3] = '-7'
-        #     elif self.aruLocation['bottom']:
-        #         instruction[3] = '7'
-
-        #     ins = ' '.join(instruction)
-        #     self.sendRequest(instruction)
         if len(aru_id) != 0:
             if self.alignLock:
                 align = True
@@ -257,14 +278,12 @@ class MinimalSubscriber(Node):
             align = False
             x = False
             y = False
-            print("Target:", self.aruTarget, aru_distance, aru_id)
             try:
                 aru_distance[index] = aru_distance[index] * 5
             except:
                 pass
             for ids in aru_id:
                 side = False
-                print(aru_id)
                 if ids[0] in self.aruSide:
                     side = True
                 if self.aruTarget == 3 and (ids[0] == 9 or ids[0] == 10):
@@ -285,19 +304,24 @@ class MinimalSubscriber(Node):
                     self.aruAligning = True
                 elif self.aruAligning == True:
                     _aru_id = np.array(aru_id).flatten()
-                    print(_aru_id,self.aruTempTarget)
+                    # print(_aru_id,self.aruTempTarget)
                     if self.aruTempTarget in _aru_id:
-                        print(self.aruTempTarget)
+                        # print(self.aruTempTarget)
                         self.aruTarget = self.aruTempTarget
                         self.aruAligning = False
                 if ids[0] != self.aruTarget:
                     print("not turn")
                     continue
+                print("Target:", self.aruTarget, aru_distance, aru_id, ids[0])
+                
+
+
                 self.locationFixed = False
                 if ids[0] == self.aruTarget:
                     self.aruLocation['id' ] = ids[0]
                     self.locationFixed = True
                 if ids[0] in self.aruFar and self.aruTarget == ids[0]:
+                    # print(aru_distance, index)
                     if aru_distance[index] < 200:
                         self.aruBeLock('', False)
                 elif ids[0] not in self.aruFar:
@@ -311,7 +335,7 @@ class MinimalSubscriber(Node):
                 else:
                     self.aruBound = [100, 200]
 
-                print(self.aruLock, self.aruLockCode)
+                # print(self.aruLock, self.aruLockCode)
                 # if ids[0] == 0 and self.aruTarget == 0:
                 #     print("id[0] processing...", self.aruLock)
                 #     aru_distance[index] = aru_distance[index] * 1.5
@@ -330,14 +354,18 @@ class MinimalSubscriber(Node):
 
                 # print("X:",aru_x[index])
                 # print("Y:", aru_y[index])
-                if aru_distance[index] < self.aruBound[0]:
-                    # self.sendRequest("rc 0 -10 0 0") # x z y raw
-                    self.aruBeLock('back', True)
-                    continue
-                elif aru_distance[index] > self.aruBound[0] and self.aruLock == True:
-                    self.aruBeLock('', False)
+                try:
+                    if aru_distance[index] < self.aruBound[0]:
+                        # self.sendRequest("rc 0 -10 0 0") # x z y raw
+                        self.aruBeLock('back', True)
+                        continue
+                    elif aru_distance[index] > self.aruBound[0] and self.aruLock == True:
+                        self.aruBeLock('', False)
+                except:
+                    pirnt(aru_distance, self.aruBound)
+                # print(aru_x[index])
                 if aru_distance[index] > self.aruBound[1]:
-                    if aru_x[index] < -0.06 and not side:
+                    if aru_x[index] < -0.06 and not side and len(aru_id) == 1 and  aru_distance[index] < 600:
                         instruction[1] = '-18'
                         instruction[2] = '0'
                         if self.locationFixed:
@@ -345,11 +373,11 @@ class MinimalSubscriber(Node):
                             self.aruLocation['right'] = False
                     elif aru_x[index] > 10:
                         pass
-                    elif aru_x[index] > 0.4 and not side:
-                        print("qua left")
+                    elif aru_x[index] > 0.4 and not side and aru_distance[index] < 600 and len(aru_id) == 1:
+                        # print("qua left")
                         instruction[1] = '18'
                         instruction[2] = '0'
-                        if ids[0] == 14:
+                        if ids[0] == 14 or ids[0] == 12:
                             instruction[1] = '25'
                         if self.locationFixed:
                             self.aruLocation['left'] = False
@@ -358,7 +386,7 @@ class MinimalSubscriber(Node):
                         if aru_distance[index] < 150:
                             instruction[1] = '0'
                             instruction[2] = '25'
-                            if ids[0] == 14:
+                            if ids[0] == 14 :
                                 instruction[1] = '25'
                             if self.locationFixed:
                                 self.aruLocation['left'] = False
@@ -367,9 +395,9 @@ class MinimalSubscriber(Node):
                             instruction[2] = '25'
                             
                         
-                    print("y:",aru_y[index] < - 0.7, self.aruAligning)
+                    # print("y:",aru_y[index] < - 0.7, self.aruAligning)
                     if aru_y[index] < -0.7 and aru_distance[index] < 670 and not self.aruAligning:
-                        print("up....")
+                        # print("up....")
                         instruction[3] = '18'
                         instruction[2] = '0'
                         if self.locationFixed:
@@ -384,7 +412,8 @@ class MinimalSubscriber(Node):
                             self.aruLocation['top'] = True
                     else:
                         instruction[3] = '-5'
-                        instruction[2] = '20'
+                        if instruction[1] == '0':
+                            instruction[2] = '20'
                         if self.locationFixed:
 
                             self.aruLocation['bottom'] = False
@@ -414,14 +443,14 @@ class MinimalSubscriber(Node):
                     print("z aligned")
                     self.aruBeLock('false', 'back')
                     if aru_x[index] < -0.06 and not side:
-                        print("qua left")
+                        # print("qua left")
                         instruction[1] = '-13'
                         if self.locationFixed:
 
                             self.aruLocation['left'] = True
                             self.aruLocation['right'] = False
                     elif aru_x[index] > 0.3 and not side:
-                        print("qua right")
+                        # print("qua right")
                         instruction[1] = '13'
                         if self.locationFixed:
 
@@ -466,7 +495,8 @@ class MinimalSubscriber(Node):
                         if aru_distance[index] < self.aruBound[1]:
                             self.aruTarget = 1
                             self.aruTempTarget = 1
-                            self.future = self.sendRequest("cw -50")
+                            self.action_processing = True
+                            self.future = self.sendRequest("cw -50", False)
                             self.action_future = True
                             self.aruGoMode = 'go'
 
@@ -478,7 +508,8 @@ class MinimalSubscriber(Node):
                         if aru_distance[index] < self.aruBound[1]:
                             self.aruTarget = 2
                             self.aruTempTarget = 2
-                            self.future = self.sendRequest("cw 50")
+                            self.action_processing = True
+                            self.future = self.sendRequest("cw 50", False)
                             self.action_future = True
 
                             self.aruGoMode = 'go'
@@ -490,18 +521,21 @@ class MinimalSubscriber(Node):
 
                             self.aruTarget = 3
                             self.aruTempTarget = 3
-                            self.future = self.sendRequest("cw 40")
+                            self.action_processing = True
+                            self.future = self.sendRequest("cw 40", False)
+                            self.keep = True
                             self.action_future = True
-
-
+                            self.aruBeLock("forward", True)
 
                             self.aruGoMode = 'go'
                     elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
                             self.aruTarget = 4
                             self.aruTempTarget = 4
-                            self.future = self.sendRequest("cw -90")
-                            self.action_future = True
+                            self.action_processing = True
+                            self.sendRequest("cw -90", False)
+                            self.keep =False
+                            self.aruBeLock("forward", True)
 
 
 
@@ -510,7 +544,8 @@ class MinimalSubscriber(Node):
                             self.aruTarget = 3
                             self.aruTempTarget = 3
                             self.aruGoMode = 'back'
-                            self.future = self.sendRequest("cw 180")
+                            self.action_processing = True
+                            self.future = self.sendRequest("cw 180", False)
                             self.action_future = True
 
 
@@ -518,7 +553,8 @@ class MinimalSubscriber(Node):
                         if aru_distance[index] < self.aruBound[1]:
                             self.aruTarget = 5
                             self.aruTempTarget = 5
-                            self.future = self.sendRequest("cw 90")
+                            self.action_processing = True
+                            self.future = self.sendRequest("cw 90", False)
                             self.action_future = True
 
 
@@ -526,8 +562,9 @@ class MinimalSubscriber(Node):
                         if aru_distance[index] < self.aruBound[1]:
                             self.aruTarget = 6
                             self.aruTempTarget = 6
-                            self.future = self.sendRequest("cw -50")
-                            self.action_future = True
+                            self.action_processing = True
+                            self.sendRequest("cw -50", False)
+                            self.aruBeLock("forward", True)
 
 
 
@@ -535,7 +572,8 @@ class MinimalSubscriber(Node):
                         if aru_distance[index] < self.aruBound[1]:
                             self.aruTarget = 7
                             self.aruTempTarget = 7
-                            self.future = self.sendRequest("cw -30")
+                            self.action_processing = True
+                            self.future = self.sendRequest("cw -40", False)
                             self.action_future = True
 
 
@@ -544,7 +582,8 @@ class MinimalSubscriber(Node):
                         if aru_distance[index] < (self.aruBound[1] + 20):
                             self.aruTarget = 8
                             self.aruTempTarget = 8
-                            self.future = self.sendRequest("cw 40")
+                            self.action_processing = True
+                            self.future = self.sendRequest("cw 40", False)
                             self.action_future = True
 
 
@@ -714,8 +753,8 @@ class MinimalSubscriber(Node):
                 font = cv2.FONT_HERSHEY_DUPLEX
                 cv2.putText(cv_image, namePut[0], (left + 6, bottom - 6), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
         elif self.stop == False and self.mode == "mask":
-            (locs, preds) = detect_mask_video.main(small_frame)
-            for (box, pred) in zip(locs, preds):
+                import detect_mask_video 
+                (locs, preds) = detect_mask_video.main(small_frame)
             # unpack the bounding box and predictions
                 (startX, startY, endX, endY) = box
                 startX = startX * 2
@@ -758,7 +797,8 @@ class MinimalSubscriber(Node):
                 cv2.rectangle(cv_image, (startX, startY), (endX, endY), color, 2)
 
         else:
-            self.sendRequest('rc 0 0 0 0')
+            pass
+            # self.sendRequest('rc 0 0 0 0')
         transback = self.bridge.cv2_to_imgmsg(cv_image, "bgr8")
         self.publisher_.publish(transback)
     
