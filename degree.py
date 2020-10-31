@@ -114,7 +114,7 @@ def imageDegreeCheck(image, it):
         left_vtx, left_fun = calc_lane_vertices(left_points, 100, image.shape[0])
     except :
         print("can't find line left")
-        return image, "cw -3"
+        return image, "rc 10 0 0 0"
     try:
         right_vtx, right_fun = calc_lane_vertices(right_points, 100, image.shape[0])
     except :
@@ -123,7 +123,7 @@ def imageDegreeCheck(image, it):
     
 
     leftLineCenter, rightLineCenter = int(left_fun(image.shape[0]/2)),int(right_fun(image.shape[0]/2))
-    center = image.shape[0] / 2
+    center = image.shape[1] / 2
     print(leftLineCenter, rightLineCenter,center)
     lineav = (leftLineCenter + rightLineCenter) / 2
     leftDegree = math.atan2(left_vtx[1][0]-left_vtx[0][0], left_vtx[1][1] - left_vtx[0][1]) * 180 / 3.14
@@ -132,35 +132,32 @@ def imageDegreeCheck(image, it):
     # print(int(abs(abs(leftDegree) - rightDegree)))
     # print( abs(int(abs(leftDegree)) - int(abs(rightDegree))), abs(int(abs(rightDegree)) - int(abs(leftDegree))) )
     degree = abs(abs(leftDegree) - abs(rightDegree))
-    result = "success"
+    result = ""
     leftcentered = False
     rightcentered = False
-    if leftLineCenter - lineav < 100 and rightLineCenter - lineav < 100:
-        result = "success"
 
-    
-    if abs(int(abs(leftDegree)) - int(abs(rightDegree))) >= 5:
+    if abs(int(abs(leftDegree)) - int(abs(rightDegree))) >= 4:
         if abs(abs(int(leftDegree)) - 40) > 5:
             print("qua right turn left")
             result = "rc 10 0 0 0"
             return image, result
-        else:
-            result = "rc 0 0 0 0"
-            leftcentered = True
 
         if abs(abs(int(rightDegree)) - 45) > 3:
             print("qua left turn right")
             result = "rc -10 0 0 0"
             return image, result
-        else:
-            result = "rc 0 0 0 0"
-            return image, result
+
     elif abs(int(abs(leftDegree)) - int(abs(rightDegree))) < 3:
         # result = "cw 0"
-        if leftLineCenter > center:
+        if leftLineCenter > (center-50):
             result = "cw 3"
         else:
-            result = "cw 0"
+            leftcentered = True
+
+        if rightLineCenter < (center+50):
+            result = "cw -3"
+        else:
+            rightcentered = True
         # if abs(abs(int(leftDegree)) - 40) > 5:
         #     print("qua right turn left")
         #     result = "cw 3"
@@ -187,9 +184,9 @@ def imageDegreeCheck(image, it):
     #     rightcentered = True
 
     if leftcentered and rightcentered:
-        result = "123213"
+        result = "cw 0"
         return image, result
-        
+
         # result = "cw "+ str(-int(abs(degree - 10)))
     # cv2.line(image, left_vtx[0], left_vtx[1], (255,0,0), 10)
     # cv2.line(image, right_vtx[0], right_vtx[1], (255,0,0), 10)
