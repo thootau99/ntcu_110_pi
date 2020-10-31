@@ -5,3 +5,4 @@ __pycache__/*
 /node_modules
 output.avi
 /image_uploader/*
+ros_multiple_thread.py

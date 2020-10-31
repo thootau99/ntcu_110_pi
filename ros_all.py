@@ -9,7 +9,7 @@ import random
 import string
 import face_recognition
 import datetime
-import threading
+import threading, queue
 
 
 from std_msgs.msg import String
