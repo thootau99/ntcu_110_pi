@@ -32,6 +32,8 @@ def clean_lines(lines, threshold):
           break
 
 def imageDegreeCheck(image, it):
+    center = image.shape[1] / 2
+    print(center)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     kernel_size = 7
     blur_gray = cv2.GaussianBlur(gray,(kernel_size,kernel_size),0)
@@ -88,21 +90,6 @@ def imageDegreeCheck(image, it):
                         right_lines.append(line)
                     else:
                         left_lines.append(line)
-                        # intangle = abs(intangle - 180)
-                    # cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
-
-                # if (angle < 145 and angle > 100) or (intangle < 50 and intangle > 28):
-                #     # cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
-                #     left_angle_av = left_angle_av + angle
-                #     left_count = left_count + 1
-                
-                # if (angle < 160 and angle > 145) or (intangle < 50 and intangle > 28):
-                #     # cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
-                #     right_angle_av = right_angle_av + angle
-                #     right_count = right_count + 1
-                #     cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
-                #     cv2.putText(line_image, str(c), (x1, y1-20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1, cv2.LINE_AA, True)
-
     clean_lines(left_lines, 0.1)
     clean_lines(right_lines, 0.1)
     left_points = [(x1, y1) for line in left_lines for x1,y1,x2,y2 in line]
@@ -123,86 +110,79 @@ def imageDegreeCheck(image, it):
     
 
     leftLineCenter, rightLineCenter = int(left_fun(image.shape[0]/2)),int(right_fun(image.shape[0]/2))
-    center = image.shape[1] / 2
     print(leftLineCenter, rightLineCenter,center)
     lineav = (leftLineCenter + rightLineCenter) / 2
     leftDegree = math.atan2(left_vtx[1][0]-left_vtx[0][0], left_vtx[1][1] - left_vtx[0][1]) * 180 / 3.14
     rightDegree = math.atan2(right_vtx[1][0]-right_vtx[0][0], right_vtx[1][1] - right_vtx[0][1]) * 180 / 3.14
-    print(leftDegree, rightDegree)
-    # print(int(abs(abs(leftDegree) - rightDegree)))
-    # print( abs(int(abs(leftDegree)) - int(abs(rightDegree))), abs(int(abs(rightDegree)) - int(abs(leftDegree))) )
     degree = abs(abs(leftDegree) - abs(rightDegree))
-    result = ""
+    result = "abcd"
     leftcentered = False
     rightcentered = False
-
+    print(abs(int(abs(leftDegree)) - int(abs(rightDegree))), abs(int(abs(leftDegree)) - int(abs(rightDegree))))
     if abs(int(abs(leftDegree)) - int(abs(rightDegree))) >= 4:
         if abs(abs(int(leftDegree)) - 40) > 5:
             print("qua right turn left")
-            result = "rc 10 0 0 0"
-            return image, result
+            if it:
+                result = "rc 10 0 0 0"
+                return image, result
+            elif it:
+                result = "rc -10 0 0 0"
+                return image, result
 
         if abs(abs(int(rightDegree)) - 45) > 3:
             print("qua left turn right")
-            result = "rc -10 0 0 0"
+            if it:
+                result = "rc -10 0 0 0"
+            elif it:
+                result = "rc 10 0 0 0"
             return image, result
 
-    elif abs(int(abs(leftDegree)) - int(abs(rightDegree))) < 3:
+        return image, "rc 0 0 0 0"
+        # if leftLineCenter > (center-50):
+        #     result = "cw 3"
+        #     return image, result
+        # else:
+        #     leftcentered = True
+
+        # if rightLineCenter < (center+50):
+        #     result = "cw -3"
+        #     return image, result
+        # else:
+        #     rightcentered = True
+
+    elif abs(int(abs(leftDegree)) - int(abs(rightDegree))) < 4:
         # result = "cw 0"
         if leftLineCenter > (center-50):
-            result = "cw 3"
+            if it:
+                result = "cw 3"
+            elif not it:
+                result = "cw -3"
+            return image, result
         else:
             leftcentered = True
 
         if rightLineCenter < (center+50):
-            result = "cw -3"
+            if it:
+                result = "cw -3"
+            elif not it:
+                result = "cw 3"
+            return image, result
         else:
             rightcentered = True
-        # if abs(abs(int(leftDegree)) - 40) > 5:
-        #     print("qua right turn left")
-        #     result = "cw 3"
-        #     return image, result
-        # else:
-        #     result = "rc 0 0 0 0"
-        #     leftcentered = True
 
-        # if abs(int(rightDegree)) - 45 > 5:
-        #     print("qua left turn right")
-        #     result = "rc -10 0 0 0"
-        #     return image, result
-        # else:
-        #     result = "rc 0 0 0 0"
-        #     return image, result
-            # result = "cw "+ str(3)
-        # result = "cw "+ str(int(abs(degree - 10)))
-    # if abs(int(abs(rightDegree)) - int(abs(leftDegree))) > 5:
-    #     print("qua right turn left")
-    #     result = "rc- 10 0 0 0"
-    #     return image, result
-    #     # result = "cw "+ str(-3)
-    # else:
-    #     rightcentered = True
 
     if leftcentered and rightcentered:
+        print("centered")
         result = "cw 0"
         return image, result
+    if result == "abcd":
+        result = "cw 0"
+        print(leftDegree, rightDegree)
+    # if not it and result == "abcd":
+    #     print(leftDegree, rightDegree, "abcd")
+    #     result = "cw 0"
+    #     return image, result
 
-        # result = "cw "+ str(-int(abs(degree - 10)))
-    # cv2.line(image, left_vtx[0], left_vtx[1], (255,0,0), 10)
-    # cv2.line(image, right_vtx[0], right_vtx[1], (255,0,0), 10)
-    # if left_count == 0:
-    #     angle_av = right_angle_av / right_count
-    # else:
-    #     angle_av = left_angle_av / left_count
-    #     left = True
     lines_edges = cv2.addWeighted(image, 0.8, line_image, 1, 0)
-    # cv2.startWindowThread()
-    # cv2.namedWindow("ppp")
-    # cv2.imshow("ppp", image)
-    # cv2.waitKey(1)
-    # if not left:
-    #     print(angle_av-(angle_av + flipav)/2)
-    # else:
-    #     print(abs(angle_av-(angle_av + flipav)/2))
-    # draw the line on the original image
+
     return image, result
