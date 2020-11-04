@@ -76,6 +76,7 @@ class MinimalSubscriber(Node):
         self.inityaw = 0
         self.realyaw = 0
         self.yawWrite = True
+outou        self.circleAcc = False
         self.nameTest = 0
         self.noRepeatName = False
         self.noRepeatNameRecord = []
@@ -148,7 +149,7 @@ class MinimalSubscriber(Node):
 
         for item in self.names: # ! 讀取在 dataset_img 下的全部圖片
             l['%s_image'%item] = face_recognition.load_image_file("dataset_img/%s.jpg"%item)
-            if len(face_recognition.face_encodings(l['%s_image'%item600])) != 0:
+            if len(face_recognition.face_encodings(l['%s_image'%item])) != 0:
                 l['%s_face_encoding'%item] = face_recognition.face_encodings(l['%s_image'%item])[0]
                 self.known_face_encodings.append(l['%s_face_encoding'%item])
                 self.known_face_names.append(item)
@@ -218,6 +219,9 @@ class MinimalSubscriber(Node):
     def heightCallback(self, data):
         if self.yawWrite:
             self.yaw = data.yaw
+            self.yawWrite = False
+
+        self.realyaw = data.yaw
 
         if data.h == 0:
             self.heightLowLock = False
@@ -264,7 +268,10 @@ class MinimalSubscriber(Node):
         if self.landautien:
             self.landautien = False
             self.yawWrite = True
-            
+        
+
+        _, result = imageDegreeCheck(cv_image)
+        
         rgb_small_frame = small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
         # check(cv_image)
         aru_x = []
@@ -297,10 +304,32 @@ class MinimalSubscriber(Node):
         if self.heightHighLock:
             self.sendRequest("rc 0 0 -10 0")
             return
+
         if not self.cwQueue.empty():
             return
 
-        imageDegreeCheck(cv_image, True)
+        if self.circleAcc:
+            print(self.realyaw, self.yaw)
+            if self.realyaw < 0:
+                ry = abs(self.realyaw) + 180
+            else:
+                ry = self.realyaw
+            if self.yaw < 0:
+                y = abs(self.yaw) + 180
+            else:
+                y = self.yaw
+
+            sa = abs(ry - y)
+            if sa <= 5:
+                self.circleAcc = False
+                print("fly again ready")
+            elif sa > 6:
+                if self.realyaw > self.yaw:
+                    instruction = "cw " + str(3)
+                elif self.realyaw < self.yaw:
+                    instruction = "cw " + str(-3)
+                self.cwQueue.put(instruction)
+                self.sendRequest()
         if self.action_future:
             self.successconb = False
             if not self.successconb:
@@ -323,7 +352,7 @@ class MinimalSubscriber(Node):
                             self.cwQueue.put(result_edge)
                         self.future = self.sendRequest(result_edge, False)
                         # self.keep = False
-                        # self.action_future = False
+                        # self.action_future = FalsecwQueue
                         # self.successconb = False
                         # if self.aruTarget in self.aruFar:
                         #     print("far target")
@@ -507,27 +536,9 @@ class MinimalSubscriber(Node):
                         if instruction[1] == '0':
                             instruction[2] = '20'
                         if self.locationFixed:
-
                             self.aruLocation['bottom'] = False
                             self.aruLocation['top'] = False
-
-                    # if abs(aru_deg[index][0]) > 150 and abs(aru_deg[index][0]) < 168:
-                    #     aru_deg[index][0] = abs(aru_deg[index][0])
-                    #     print(aru_deg[index][0], "deg absed")
-
-                    
                             self.scannedArucoCode.append(0)
-                    # if aru_deg[index][0] < -90 and aru_deg[index][0] > -150:
-                    #     instruction = ['rc', '0', '0', '0', '0']
-                    #     instruction[4] = "-10"
-                    #     instruction[2] = "-3"
-                    #     print(aru_deg[index][0], "deg qua left")
-
-                    # elif aru_deg[index][0] > 90 and aru_deg[index][0] < 150:
-                    #     instruction = ['rc', '0', '0', '0', '0']
-                    #     instruction[4] = '10'
-                    #     instruction[2] = '-3'
-                    #     print(aru_deg[index][0], "deg qua right")
 
                     ins = ' '.join(instruction)
                     self.sendRequest(ins)
@@ -535,14 +546,12 @@ class MinimalSubscriber(Node):
                     print("z aligned")
                     self.aruBeLock('false', 'back')
                     if aru_x[index] < -0.06 and not side:
-                        # print("qua left")
                         instruction[1] = '-13'
                         if self.locationFixed:
 
                             self.aruLocation['left'] = True
                             self.aruLocation['right'] = False
                     elif aru_x[index] > 0.3 and not side:
-                        # print("qua right")
                         instruction[1] = '13'
                         if self.locationFixed:
 
@@ -582,32 +591,6 @@ class MinimalSubscriber(Node):
                         self.sendRequest(ins)
                 # print(ids[0], aru_distance[index])
                 if align:
-                    if ids[0] == 0 and self.aruTarget == 0 and self.aruGoMode == 'go':
-                        if aru_distance[index] < self.aruBound[1]:
-                            self.aruTarget = 1
-                            self.aruTempTarget = 1
-                            self.action_processing = True
-                            self.future = self.sendRequest("cw -50", False)
-                            self.cwQueue.put("cw -50")
-                            self.action_future = True
-                            self.aruGoMode = 'go'
-
-                        
-
-                            
-
-                    elif ids[0] == 1 and self.aruTarget == 1 and self.aruGoMode == 'go':
-                        if aru_distance[index] < self.aruBound[1]:
-                            self.aruTarget = 2
-                            self.aruTempTarget = 2
-                            self.action_processing = True
-                            self.future = self.sendRequest("cw 50", False)
-                            self.cwQueue.put("cw 50")
-                            self.aruBeLock("forward", True)
-
-                            self.aruGoMode = 'go'
-
-                    
                     elif ids[0] == 2 and self.aruTarget == 2 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
                             # self.sendRequest("cw 30")
@@ -623,46 +606,20 @@ class MinimalSubscriber(Node):
                             self.aruGoMode = 'go'
                     elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.aruTarget = 4
-                            self.aruTempTarget = 4
-                            self.action_processing = True
-                            self.cwQueue.put("cw -90")
-                            self.sendRequest("cw -90", False)
-                            # self.action_future = True
-                            self.aruBeLock("forward", True)
-
-
-
-                    elif ids[0] == 4 and self.aruTarget == 4 and self.aruGoMode == 'go':
-                        if aru_distance[index] < self.aruBound[1]:
-                            self.aruTarget = 3
-                            self.aruTempTarget = 3
-                            self.aruGoMode = 'back'
-                            self.action_processing = True
-                            self.cwQueue.put("cw 180")
-
-                            self.future = self.sendRequest("cw 180", False)
-                            self.combArray.clear()
-                            self.action_future = True
-
-
-                    elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'back':
-                        if aru_distance[index] < self.aruBound[1]:
                             self.aruTarget = 5
                             self.aruTempTarget = 5
                             self.action_processing = True
-                            self.cwQueue.put("cw 90")
-
-                            self.future = self.sendRequest("cw 90", False)
-                            self.action_future = True
-
+                            self.cwQueue.put("cw 180")
+                            self.sendRequest("cw 180", False)
+                            # self.action_future = True
+                            self.aruBeLock("forward", True)
 
                     elif ids[0] == 5 and self.aruTarget == 5 and self.aruGoMode == 'back':
                         if aru_distance[index] < self.aruBound[1]:
                             self.aruTarget = 2
                             self.aruTempTarget = 2
-                            self.cwQueue.put("cw 90")
-                            self.sendRequest("cw 90", False)
+                            self.cwQueue.put("cw 120")
+                            self.sendRequest("cw 120", False)
                             self.aruBeLock("forward", True)
 
                     elif ids[0] == 2 and self.aruTarget == 2 and self.aruGoMode == 'back':
@@ -672,6 +629,8 @@ class MinimalSubscriber(Node):
                             self.sendRequest("land", False)
 
                             self.aruGoMode = 'go'
+                            self.circleAcc = True
+
 
                     elif ids[0] == 6 and self.aruTarget == 6 and self.aruGoMode == 'back':
                         if aru_distance[index] < self.aruBound[1]:
