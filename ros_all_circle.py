@@ -76,7 +76,7 @@ class MinimalSubscriber(Node):
         self.inityaw = 0
         self.realyaw = 0
         self.yawWrite = True
-outou        self.circleAcc = False
+        self.circleAcc = False
         self.nameTest = 0
         self.noRepeatName = False
         self.noRepeatNameRecord = []
