@@ -32,55 +32,79 @@ def clean_lines(lines, threshold):
         else:
           break
 
+def select_white_yellow(image):
+    # yellow color mask
+    lower = np.uint8([ 26,  43, 46])
+    upper = np.uint8([ 34, 255, 255])
+    yellow_mask = cv2.inRange(image, lower, upper)
+    # combine the mask
+    # mask = cv2.bitwise_or(white_mask, yellow_mask)
+    return cv2.bitwise_and(image, image, mask = yellow_mask)
+
+def convert_gray_scale(image):
+    return cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+
+def filter_region(image, vertices):
+    """
+    Create the mask using the vertices and apply it to the input image
+    """
+    mask = np.zeros_like(image)
+    if len(mask.shape)==2:
+        cv2.fillPoly(mask, vertices, 255)
+    else:
+        cv2.fillPoly(mask, vertices, (255,)*mask.shape[2]) # in case, the input image has a channel dimension        
+    return cv2.bitwise_and(image, mask)
+
+    
+def select_region(image):
+    """
+    It keeps the region surrounded by the `vertices` (i.e. polygon).  Other area is set to 0 (black).
+    """
+    # first, define the polygon by vertices
+    rows, cols = image.shape[:2]
+    bottom_left  = [cols*0.1, rows*0.95]
+    top_left     = [cols*0.4, rows*0.6]
+    bottom_right = [cols*0.9, rows*0.95]
+    top_right    = [cols*0.6, rows*0.6] 
+    # the vertices are an array of polygons (i.e array of arrays) and the data type must be integer
+    vertices = np.array([[bottom_left, top_left, top_right, bottom_right]], dtype=np.int32)
+    return filter_region(image, vertices)
+
+def hough_lines(image):
+    """
+    `image` should be the output of a Canny transform.
+    
+    Returns hough lines (not the image with lines)
+    """
+    return cv2.HoughLinesP(image, rho=1, theta=np.pi/180, threshold=20, minLineLength=20, maxLineGap=300)
+
 def imageDegreeCheck(image, it):
     hsv = cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
-    low_yellow = np.array([15, 90 ,140]) # 20, 100 ,100
-    high_yellow = np.array([50,160,255]) # 30, 255 ,255
-    mask_hsv = cv2.inRange(hsv,low_yellow,high_yellow)
-
-    cv2.startWindowThread()
-    cv2.namedWindow("123")
-    cv2.imshow("123", mask_hsv)
-    cv2.waitKey(1)
-    # kernel_size = 7
-    # blur_gray = cv2.GaussianBlur(gray,(kernel_size,kernel_size),0)
+    
+    low_yellow = np.array([21, 39 ,64]) # 15, 90 ,140
+    high_yellow = np.array([40,255,255]) # 50, 160 ,255
+    mask_hsv = select_white_yellow(hsv)
+    kernel_size = 7
+    gray = convert_gray_scale(mask_hsv)
+    blur_gray = cv2.GaussianBlur(gray,(kernel_size,kernel_size),0)
     low_threshold = 100
     high_threshold = 300
 
-    edges = cv2.Canny(mask_hsv, 50, 150)
+    edges = cv2.Canny(blur_gray, 50, 150)
+    masked_edges = select_region(edges)
 
-    # create a mask of the edges image using cv2.filpoly()
-    mask = np.zeros_like(edges)
-    ignore_mask_color = 1
 
-    # define the Region of Interest (ROI) - source code sets as a trapezoid for roads
-    imshape = image.shape
 
-    vertices = np.array([[(0,imshape[0]),(100, 420), (1590, 420),(imshape[1],imshape[0])]], dtype=np.int32)
-
-    cv2.fillPoly(mask, vertices, ignore_mask_color)
-    masked_edges = cv2.bitwise_and(edges, mask)
-
-    # mybasic ROI bounded by a blue rectangle
-
-    # ROI = cv2.rectangle(image,(0,420),(1689,839),(0,255,0),3)
-    # l = ROI
-    # cv2.startWindowThread()
-    # cv2.namedWindow("ppp123123")
-    # cv2.imshow("ppp", l)
-    # cv2.waitKey(1)
-    # define the Hough Transform parameters
-    rho = 1 # distance resolution in pixels of the Hough grid
-    theta = np.pi/180 # angular resolution in radians of the Hough grid
-    threshold = 20  # minimum number of votes (intersections in Hough grid cell)
-    min_line_length = 20 #minimum number of pixels making up a line
-    max_line_gap = 300    # maximum gap in pixels between connectable line segments
+    cv2.startWindowThread()
+    cv2.namedWindow("123")
+    cv2.imshow("123", masked_edges)
+    cv2.waitKey(1)
 
     # make a blank the same size as the original image to draw on
     line_image = np.copy(image)*0
 
     # run Hough on edge detected image
-    lines = cv2.HoughLinesP(masked_edges, rho, theta, threshold, np.array([]),min_line_length, max_line_gap)
+    lines = hough_lines(masked_edges)
     left_lines = []
     right_lines = []
     try:
@@ -90,9 +114,9 @@ def imageDegreeCheck(image, it):
         pass
     for line in lines:
             for x1,y1,x2,y2 in line:
-                cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
-
-
+                # cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
+                if x1 == x2:
+                    continue
                 angle = math.atan2(x2-x1, y2-y1)
                 angle = angle * 180 / 3.14
                 intangle = int(angle)
@@ -129,18 +153,19 @@ def imageDegreeCheck(image, it):
     right_points = [(x1, y1) for line in right_lines for x1,y1,x2,y2 in line]
     right_points = right_points + [(x2, y2) for line in right_lines for x1,y1,x2,y2 in line]
     lines_edges = cv2.addWeighted(image, 0.8, line_image, 1, 0)
+    l = lines_edges
+    cv2.startWindowThread()
+    cv2.namedWindow("ppp_hsv")
+    cv2.imshow("ppp_hsv", l)
+    cv2.waitKey(1)
     try:
-        left_vtx, left_fun = calc_lane_vertices(left_points, 100, image.shape[0])
+        left_vtx, left_fun = calc_lane_vertices(left_points, 200, image.shape[0])
     except :
         print("can't find line left")
-        l = edges
-        cv2.startWindowThread()
-        cv2.namedWindow("ppp")
-        cv2.imshow("ppp", l)
-        cv2.waitKey(1)
         return image, "rc 10 0 0 0"
+        
     try:
-        right_vtx, right_fun = calc_lane_vertices(right_points, 100, image.shape[0])
+        right_vtx, right_fun = calc_lane_vertices(right_points, 200, image.shape[0])
     except :
         print("can't find line right")
         l = edges
@@ -162,7 +187,7 @@ def imageDegreeCheck(image, it):
 
     leftLineCenter, rightLineCenter = int(left_fun(image.shape[0]/2)),int(right_fun(image.shape[0]/2))
     center = image.shape[1] / 2
-    # print(leftLineCenter, rightLineCenter,center)
+    print(leftLineCenter, rightLineCenter,center)
     lineav = (leftLineCenter + rightLineCenter) / 2
     leftDegree = math.atan2(left_vtx[1][0]-left_vtx[0][0], left_vtx[1][1] - left_vtx[0][1]) * 180 / 3.14
     rightDegree = math.atan2(right_vtx[1][0]-right_vtx[0][0], right_vtx[1][1] - right_vtx[0][1]) * 180 / 3.14
@@ -177,18 +202,28 @@ def imageDegreeCheck(image, it):
     print(abs(int(abs(leftDegree)) - int(abs(rightDegree))))
 
     if abs(int(abs(leftDegree)) - int(abs(rightDegree))) >= 4:
+        if leftDegree > 3:
+
+            print("can't get actually left line so turn left")
+            result = "rc -10 0 0 0"
+            return image, result
+        if rightDegree < -3:
+            print("can't get actually right line so turn right")
+            result = "rc 10 0 0 0"
+            return image, result
         print(abs(int(leftDegree) - (-11)))
         if abs(int(leftDegree) - (-11)) > 5:
-            print("qua right turn left")
+            print("qua leftt turn right")
             result = "rc 10 0 0 0"
             return image, result
 
         if abs(abs(int(rightDegree)) - 18) > 10:
-            print("qua left turn right")
+            print("qua right turn left")
             result = "rc -10 0 0 0"
             return image, result
 
     elif abs(int(abs(leftDegree)) - int(abs(rightDegree))) < 3:
+        
         # result = "cw 0"
         if leftLineCenter > (center-5):
             result = "cw 3"
@@ -226,8 +261,10 @@ def imageDegreeCheck(image, it):
 
     if leftcentered and rightcentered:
         result = "cw 0"
-        return image, result
+        print(result)
 
+        return image, result
+    print(result)
         # result = "cw "+ str(-int(abs(degree - 10)))
     # if left_count == 0:
     #     angle_av = right_angle_av / right_count
@@ -242,11 +279,19 @@ def imageDegreeCheck(image, it):
     return image, result
 
 
-# im = cv2.imread("test10_tapped.png")
+# im = cv2.imread("nnss.png")
 
 # im, result = imageDegreeCheck(im, True)
 
-# print(result)
-# im = cv2.resize(im,(0,0),fx=0.1, fy=0.1)
-# cv2.imshow('mat', im)
-# cv2.waitKey(0)
+
+cap = cv2.VideoCapture('output.avi')
+
+while(cap.isOpened()):
+    ret, frame = cap.read()
+    im, result = imageDegreeCheck(frame, True)
+    cv2.imshow('frame',im)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()

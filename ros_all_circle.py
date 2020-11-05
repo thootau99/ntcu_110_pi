@@ -23,7 +23,7 @@ from cv_bridge import CvBridge
 
 from fix import check
 from aruco import aru
-from degree import imageDegreeCheck
+from degree_test_new import imageDegreeCheck
 from pprint import pprint
 # print('aaa')
 
@@ -79,6 +79,7 @@ class MinimalSubscriber(Node):
         self.nameTest = 0
         self.noRepeatName = False
         self.noRepeatNameRecord = []
+        self.cwSwitch = False
         self.L0 = 120   # 人與camera的距離
         self.S0 = 25600 # 預計的人臉框大小
         self.CX = 480   # 大約在畫面中間的 X 座標
@@ -112,8 +113,9 @@ class MinimalSubscriber(Node):
         self.aruBound = [100, 130]
         self.dark = False # 看圖有沒有過黑
         self.read_path('./dataset_img') # 到 /dataset_img 讀資料
-        self.followName = 'uahuynh'        
+        self.followName = 'uahuynh'
         self.aruTarget = 2
+        self.futureInstruction = ""
         self.aruSide = []
         self.aruFar = [0,2,3,4,5,6,7,8]
         self.xwide = [5, 6, 7, 8,9]
@@ -148,7 +150,7 @@ class MinimalSubscriber(Node):
 
         for item in self.names: # ! 讀取在 dataset_img 下的全部圖片
             l['%s_image'%item] = face_recognition.load_image_file("dataset_img/%s.jpg"%item)
-            if len(face_recognition.face_encodings(l['%s_image'%item600])) != 0:
+            if len(face_recognition.face_encodings(l['%s_image'%item])) != 0:
                 l['%s_face_encoding'%item] = face_recognition.face_encodings(l['%s_image'%item])[0]
                 self.known_face_encodings.append(l['%s_face_encoding'%item])
                 self.known_face_names.append(item)
@@ -233,6 +235,7 @@ class MinimalSubscriber(Node):
             self.heightHighLock = False
 
     def responseCallBack(self,data):
+        print(self.cwQueue.qsize())
         try:
             self.battery = int(data.str)
             self.battery = str(self.battery)
@@ -242,7 +245,7 @@ class MinimalSubscriber(Node):
             print(self.cwQueue.empty(), self.cwQueue.qsize())
             if self.cwQueue.empty():
                 return
-            instruction = self.cwQueue.get()
+            instruction = self.cwQueue.get() 
             print(instruction)
             self.cwQueue.put(instruction)
             self.sendRequest(instruction)
@@ -299,8 +302,13 @@ class MinimalSubscriber(Node):
             return
         if not self.cwQueue.empty():
             return
-
-        imageDegreeCheck(cv_image, True)
+        if self.futureInstruction != "":
+            print(self.futureInstruction)
+            self.cwQueue.put(self.futureInstruction)
+            self.sendRequest(self.futureInstruction)
+            self.futureInstruction = ""
+            return
+        _, r = imageDegreeCheck(cv_image, True)
         if self.action_future:
             self.successconb = False
             if not self.successconb:
@@ -312,6 +320,8 @@ class MinimalSubscriber(Node):
                 else:
                     self.successconb = True
                     if result_edge == "" or result_edge == "cw 0":
+                        if self.cwSwitch:
+                            return
                         self.keep = False
                         self.action_future = False
                         self.successconb = False
@@ -320,6 +330,7 @@ class MinimalSubscriber(Node):
                             self.aruBeLock("forward", True)
                     else:
                         if "cw" in result_edge:
+                            self.cwSwitch = True
                             self.cwQueue.put(result_edge)
                         self.future = self.sendRequest(result_edge, False)
                         # self.keep = False
@@ -336,7 +347,12 @@ class MinimalSubscriber(Node):
         #     self.sendRequest("battery?")
         #     self.landautien = False600
 
-            
+        
+        if self.cwSwitch:
+            self.action_future = True
+            return
+        
+
         if self.aruLock:
             if self.aruLockCode == 'back':
                 self.sendRequest('rc 0 -10 0 0')
@@ -612,15 +628,17 @@ class MinimalSubscriber(Node):
                         if aru_distance[index] < self.aruBound[1]:
                             # self.sendRequest("cw 30")
 
-                            self.aruTarget = 3
-                            self.aruTempTarget = 3
+                            self.aruTarget = 6
+                            self.aruTempTarget = 6
                             self.action_processing = True
                             self.cwQueue.put("cw 40")
                             self.future = self.sendRequest("cw 40", False)
+                            self.futureInstruction = "cw 140"
+
                             self.action_future = True
                             self.aruBeLock("forward", True)
 
-                            self.aruGoMode = 'go'
+                            self.aruGoMode = 'back'
                     elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
                             self.aruTarget = 4
@@ -675,12 +693,14 @@ class MinimalSubscriber(Node):
 
                     elif ids[0] == 6 and self.aruTarget == 6 and self.aruGoMode == 'back':
                         if aru_distance[index] < self.aruBound[1]:
-                            self.aruTarget = 7
-                            self.aruTempTarget = 7
+                            self.aruTarget = 2
+                            self.aruTempTarget = 2
                             self.action_processing = True
-                            self.cwQueue.put("cw -40")
-                            self.future = self.sendRequest("cw -40", False)
-                            # self.action_future = True
+                            self.cwQueue.put("cw 180")
+                            self.future = self.sendRequest("cw 180", False)
+                            self.action_future = True
+                            self.aruGoMode = 'go'
+
 
 
 
