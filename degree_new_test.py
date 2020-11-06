@@ -175,14 +175,14 @@ def imageDegreeCheck(image, mode):
     status = ""
     result  = ""
     try:
-        left_vtx, left_fun = calc_lane_vertices(left_points, 250, image.shape[0])
+        left_vtx, left_fun = calc_lane_vertices(left_points, 100, image.shape[0])
         leftDegree = math.atan2(left_vtx[1][0]-left_vtx[0][0], left_vtx[1][1] - left_vtx[0][1]) * 180 / 3.14
         cv2.line(image, left_vtx[0], left_vtx[1], (255,0,0), 10)
     except :
         status = "left"
         # print("can't find line left")
     try:
-        right_vtx, right_fun = calc_lane_vertices(right_points, 250, image.shape[0])
+        right_vtx, right_fun = calc_lane_vertices(right_points, 100, image.shape[0])
         rightDegree = math.atan2(right_vtx[1][0]-right_vtx[0][0], right_vtx[1][1] - right_vtx[0][1]) * 180 / 3.14
         cv2.line(image, right_vtx[0], right_vtx[1], (255,0,0), 10)
     except :
@@ -224,6 +224,7 @@ def imageDegreeCheck(image, mode):
     elif status == "leftright":
         return image, result, status
     line_center = int((left_vtx[1][0] + right_vtx[1][0]) / 2)
+    line_center_top = int((left_vtx[0][0] + right_vtx[0][0]) / 2)
     center = int(image.shape[1] / 2)
     top = int(image.shape[0] * 0.6)
     realTop = image.shape[0] - top
@@ -238,7 +239,7 @@ def imageDegreeCheck(image, mode):
     left_mean = left_total/mean*100
     right_mean = right_total/mean*100
     distanceToCenter = line_center - center
-    cv2.line(image, (line_center, 0), (line_center, image.shape[1]), (0, 0, 255), 5)
+    cv2.line(image, (line_center, 0), (line_center_top, image.shape[1]), (0, 0, 255), 5)
     cv2.line(image, (center, 0), (center, image.shape[0]), (0, 0, 0), 5)
     # print(leftDegree, rightDegree)
     if center < line_center:
