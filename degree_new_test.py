@@ -240,6 +240,7 @@ def imageDegreeCheck(image, mode):
     right_mean = right_total/mean*100
     distanceToCenter = line_center - center
     cv2.line(image, (line_center, 0), (line_center_top, image.shape[1]), (0, 0, 255), 5)
+    centerDegree = math.atan2(line_center_top-line_center, image.shape[1]) * 180 / 3.14
     cv2.line(image, (center, 0), (center, image.shape[0]), (0, 0, 0), 5)
     # print(leftDegree, rightDegree)
     if center < line_center:
@@ -260,6 +261,8 @@ def imageDegreeCheck(image, mode):
     print(left_mean, right_mean)
     if left_mean > right_mean:
         print("right < left")
+        print("centerDegree", centerDegree)
+
         dx = left_mean-right_mean
         print("dx:",dx)
         if dx > 15 and mode == 'back':
@@ -276,6 +279,8 @@ def imageDegreeCheck(image, mode):
 
     else:
         print("left < right")
+        print("centerDegree", centerDegree)
+
         dx = right_mean-left_mean
         print("dx:",dx)
 
@@ -312,7 +317,7 @@ def imageDegreeCheck(image, mode):
 #     im, result,status = imageDegreeCheck(frame, 'go')
 #     print(status)
     
-#     cv2.imshow('frame',im)
+#     cv2.imshow('frame',im   )
 #     key = cv2.waitKey(20)
 #     if cv2.waitKey(20) & 0xFF == ord('q'):
 #         break
