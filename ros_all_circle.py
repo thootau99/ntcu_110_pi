@@ -23,7 +23,7 @@ from cv_bridge import CvBridge
 
 from fix import check
 from aruco import aru
-from degree_test_new import imageDegreeCheck
+from degree_new_test import imageDegreeCheck
 from pprint import pprint
 # print('aaa')
 
@@ -99,6 +99,8 @@ class MinimalSubscriber(Node):
         self.unknownTakeAgainName = ''
         self.unknownTakeAgainCount = 0
         self.executeArcode = False
+        self.noLineStatus = ""
+        self.noLineInstruction = ""
         self.heightLowLock = False
         self.heightHighLock = False
         self.xdistanceLock = 600
@@ -129,6 +131,7 @@ class MinimalSubscriber(Node):
         self.traceLocationAruco = False
         self.scannedArucoCode = []
         self.combArray = []
+        self.combError = 0
         self.mode = ''
         l = locals()
                     # if abs(aru_deg[index][0]) > 150 and abs(aru_deg[index][0]) < 168:
@@ -218,6 +221,7 @@ class MinimalSubscriber(Node):
         self.aruLock = s
         self.aruLockCode = mode
     def heightCallback(self, data):
+        self.battery = str(data.bat)
         if self.yawWrite:
             self.yaw = data.yaw
 
@@ -266,6 +270,7 @@ class MinimalSubscriber(Node):
         
         if self.landautien:
             self.landautien = False
+            self.action_future = True
             self.yawWrite = True
             
         rgb_small_frame = small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
@@ -284,8 +289,8 @@ class MinimalSubscriber(Node):
         #     self.batteryCount = 0
         # else:
         #     self.batteryCount = self.batteryCount + 1
-        # batteryStr = "battery" + self.battery
-        # cv2.putText(small_frame, batteryStr, (0,20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
+        batteryStr = "battery: " + self.battery
+        cv2.putText(small_frame, batteryStr, (0,20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
 
         cv2.startWindowThread()
         cv2.namedWindow("preview")
@@ -308,12 +313,40 @@ class MinimalSubscriber(Node):
             self.sendRequest(self.futureInstruction)
             self.futureInstruction = ""
             return
-        _, r = imageDegreeCheck(cv_image, True)
+        _, r, s = imageDegreeCheck(cv_image, self.aruGoMode)
+        if "cw" in r:
+            print("cw", r)
         if self.action_future:
             self.successconb = False
             if not self.successconb:
-                # if self.aruGoMode == "go":
-                _, result_edge = imageDegreeCheck(cv_image, True)
+                # if self.aruGoMode == "go": 
+                _, result_edge, status = imageDegreeCheck(cv_image, self.aruGoMode)
+                print(status, self.noLineStatus)
+                if self.noLineStatus != "":
+                    if status == "":
+                        self.noLineStatus = ""
+                        self.noLineInstruction = ""
+                    else:
+                        self.sendRequest(self.noLineInstruction)
+                        return
+                if status != "":
+                    if status == 'left':
+                        self.noLineStatus = 'left'
+                        self.noLineInstruction = 'rc -10 0 0 0'
+                    elif status == 'notrealleft':
+                    #     if self.noLineStatus == "left":
+                    #         self.noLineStatus = 'notrealleft'
+                    #         self.noLineInstruction = "rc 10 0 0 0"
+                        self.noLineStatus = 'notrealleft'
+                        self.noLineInstruction = "rc 10 0 0 0"
+                    elif status == 'right':
+                        self.noLineStatus = "right"
+                        self.noLineInstruction = "rc 10 0 0 0"
+                    elif status == "notrealright":
+                        self.noLineStatus = "notrealright"
+                        self.noLineInstruction = "rc -10 0 0 0"
+                    return
+                
                 if result_edge == 0:
                     print('conb failed')
                     return
@@ -325,6 +358,7 @@ class MinimalSubscriber(Node):
                         self.keep = False
                         self.action_future = False
                         self.successconb = False
+                        self.combError = 0
                         if self.aruTarget in self.aruFar:
                             print("far target")
                             self.aruBeLock("forward", True)
@@ -341,8 +375,29 @@ class MinimalSubscriber(Node):
                         #     self.aruBeLock("forward", True)
                         return
                     print(result_edge)
-        
-        # if self.landautien:
+        # print(self.combError)
+        # if r != "cw 0" or r != "":
+        #     self.combError = self.combError + 1
+        # if self.combError > 10:
+        #     self.action_future = True
+        if s != "":
+            try:
+                save = s.split(' ')
+                print(save)
+                if save[0] == "lefttoomuch" or save[0] == "righttoomuch":
+                    if int(save[1]) > 100:
+                        if save[0] == "lefttoomuch":
+                            self.sendRequest("cw 3")
+                            self.cwQueue.put("cw 3")
+                            return
+                        elif save[0] == "righttoomuch":
+                            self.sendRequest("cw -3")
+                            self.cwQueue.put("cw -3")
+                            return
+            except:
+                pass
+        if self.landautien:
+            self.action_future = True
         #     self.cwQueue.put("battery?")
         #     self.sendRequest("battery?")
         #     self.landautien = False600
@@ -402,6 +457,7 @@ class MinimalSubscriber(Node):
                     else:
                         self.action_future = True
                         self.combArray.append(ids[0])
+                        print(self.combArray)
                         return
 
                 if ids[0] == 10 and not self.action_future:
@@ -410,6 +466,8 @@ class MinimalSubscriber(Node):
                     else:
                         self.action_future = True
                         self.combArray.append(ids[0])
+                        print(self.combArray)
+
                         return 
 
                 if ids[0] != self.aruTarget:
@@ -634,10 +692,10 @@ class MinimalSubscriber(Node):
                             self.cwQueue.put("cw 40")
                             self.future = self.sendRequest("cw 40", False)
                             self.futureInstruction = "cw 140"
-
+                            
                             self.action_future = True
                             self.aruBeLock("forward", True)
-
+                            self.combArray.clear()
                             self.aruGoMode = 'back'
                     elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
@@ -699,6 +757,8 @@ class MinimalSubscriber(Node):
                             self.cwQueue.put("cw 180")
                             self.future = self.sendRequest("cw 180", False)
                             self.action_future = True
+                            self.combArray.clear()
+
                             self.aruGoMode = 'go'
 
 
