@@ -240,7 +240,7 @@ def imageDegreeCheck(image, mode):
     right_mean = right_total/mean*100
     distanceToCenter = line_center - center
     cv2.line(image, (line_center, 0), (line_center_top, image.shape[1]), (0, 0, 255), 5)
-    centerDegree = math.atan2(line_center_top-line_center, image.shape[1]) * 180 / 3.14
+    centerDegree = int(math.atan2(line_center_top-line_center, image.shape[1]) * 180 / 3.14)
     cv2.line(image, (center, 0), (center, image.shape[0]), (0, 0, 0), 5)
     # print(leftDegree, rightDegree)
     if center < line_center:
@@ -262,16 +262,16 @@ def imageDegreeCheck(image, mode):
     if left_mean > right_mean:
         print("right < left")
         print("centerDegree", centerDegree)
-
+        centerDegree = abs(centerDegree)
         dx = left_mean-right_mean
         print("dx:",dx)
         if dx > 15 and mode == 'back':
-            result = "cw 3"
-            print("cw 3")
+            result = "cw "+str(centerDegree)
+            print(result)
             
         elif dx > 15 and mode == 'go':
-            result = "cw -3"
-            print("cw -3")
+            result = "cw -"+str(centerDegree)
+            print(result)
         else:
             result = "cw 0"
             print("cw 0")
@@ -280,17 +280,18 @@ def imageDegreeCheck(image, mode):
     else:
         print("left < right")
         print("centerDegree", centerDegree)
+        centerDegree = abs(centerDegree)
 
         dx = right_mean-left_mean
         print("dx:",dx)
 
         if dx > 15 and mode == "back":
-            result = "cw -3"
-            print("cw -3")
+            result = "cw -"+str(centerDegree)
+            print(result)
              
         elif dx > 15 and mode == "go":
-            result = "cw 3"
-            print("cw 3")
+            result = "cw "+str(centerDegree)
+            print(result)
         else:
             # result = "cw 0"
             print("cw 0")
@@ -309,20 +310,20 @@ def imageDegreeCheck(image, mode):
 # cv2.waitKey(0)
 #TODO: how to calc the total? 
 
-# cap = cv2.VideoCapture('output.avi')
+cap = cv2.VideoCapture('output.avi')
 
-# while(cap.isOpened()):
-#     cap.set(cv2.CAP_PROP_FPS, 10)
-#     ret, frame = cap.read()
-#     im, result,status = imageDegreeCheck(frame, 'go')
-#     print(status)
+while(cap.isOpened()):
+    cap.set(cv2.CAP_PROP_FPS, 10)
+    ret, frame = cap.read()
+    im, result,status = imageDegreeCheck(frame, 'go')
+    print(status)
     
-#     cv2.imshow('frame',im   )
-#     key = cv2.waitKey(20)
-#     if cv2.waitKey(20) & 0xFF == ord('q'):
-#         break
-#     if key == ord('p'):
-#         cv2.waitKey(-1)
+    cv2.imshow('frame',im   )
+    key = cv2.waitKey(20)
+    if cv2.waitKey(20) & 0xFF == ord('q'):
+        break
+    if key == ord('p'):
+        cv2.waitKey(-1)
 
 # cap.release()
 # cv2.destroyAllWindows()
