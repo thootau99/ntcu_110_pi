@@ -331,17 +331,23 @@ class MinimalSubscriber(Node):
                         return
                 if status != "":
                     if status == 'left':
-                        self.noLineStatus = 'left'
-                        self.noLineInstruction = 'rc -10 0 0 0'
+                        if self.noLineInstruction == 'notrealleft':
+                            pass
+                        else:
+                            self.noLineStatus = 'left'
+                            self.noLineInstruction = 'rc -10 0 0 0'
                     elif status == 'notrealleft':
-                    #     if self.noLineStatus == "left":
+                    #     if self.noLineStatus == "left"
                     #         self.noLineStatus = 'notrealleft'
                     #         self.noLineInstruction = "rc 10 0 0 0"
                         self.noLineStatus = 'notrealleft'
                         self.noLineInstruction = "rc 10 0 0 0"
                     elif status == 'right':
-                        self.noLineStatus = "right"
-                        self.noLineInstruction = "rc 10 0 0 0"
+                        if self.noLineStatus == "notrealright":
+                            pass
+                        else:
+                            self.noLineStatus = "right"
+                            self.noLineInstruction = "rc 10 0 0 0"
                     elif status == "notrealright":
                         self.noLineStatus = "notrealright"
                         self.noLineInstruction = "rc -10 0 0 0"

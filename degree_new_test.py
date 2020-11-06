@@ -115,20 +115,34 @@ def imageDegreeCheck(image, mode):
 
     for line in lines:
             for x1,y1,x2,y2 in line:
-                # cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
-                if x1 == x2:
-                    continue
-                angle = math.atan2(x2-x1, y2-y1)
-                angle = angle * 180 / 3.14
-                intangle = int(angle)
-                if (intangle < 178 and intangle > 135) or (intangle < 80 and intangle > 5):
-                    # print(intangle)
-                    if intangle == 180:
-                        continue
-                    if intangle < 50 and intangle > 5:
-                        right_lines.append(line)
-                    else:
-                        left_lines.append(line)
+                cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
+
+                if x2==x1:
+                    continue # ignore a vertical line
+                slope = (y2-y1)/(x2-x1)
+                intercept = y1 - slope*x1
+                cv2.putText(line_image, str(slope), (x1, y1-20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1, cv2.LINE_AA, True)
+                # length = np.sqrt((y2-y1)**2+(x2-x1)**2)
+                if slope < 0: # y is reversed in image
+                    left_lines.append(line)
+                else:
+                    right_lines.append(line)
+                # if x1 == x2:
+                #     continue
+                # angle = math.atan2(x2-x1, y2-y1)
+                # angle = angle * 180 / 3.14
+                # intangle = int(angle)
+                
+                # if (intangle < 178 and intangle > 135) or (intangle < 80 and intangle >= 4):
+                #     # print(intangle)
+                #     if intangle == 180:
+                #         continue
+                #     if intangle < 50 and intangle > 4:
+                #         print("intangle right",intangle)
+                #         right_lines.append(line)
+                #     else:
+                #         print("intangle left",intangle)
+                #         left_lines.append(line)
                         # intangle = abs(intangle - 180)
 
                 # if (angle < 145 and angle > 100) or (intangle < 50 and intangle > 28):
@@ -140,15 +154,14 @@ def imageDegreeCheck(image, mode):
                 #     right_angle_av = right_angle_av + angle
                 #     right_count = right_count + 1
                 #     cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
-                    cv2.putText(line_image, str(intangle), (x1, y1-20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1, cv2.LINE_AA, True)
 
     cv2.startWindowThread()
     cv2.namedWindow("ppaaaap")
     cv2.imshow("ppaaaap", line_image)
     cv2.waitKey(1)
 
-    clean_lines(left_lines, 0.4)
-    clean_lines(right_lines, 0.4)
+    clean_lines(left_lines, 0.1)
+    clean_lines(right_lines, 0.1)
     left_points = [(x1, y1) for line in left_lines for x1,y1,x2,y2 in line]
     left_points = left_points + [(x2, y2) for line in left_lines for x1,y1,x2,y2 in line]
     right_points = [(x1, y1) for line in right_lines for x1,y1,x2,y2 in line]
@@ -162,14 +175,14 @@ def imageDegreeCheck(image, mode):
     status = ""
     result  = ""
     try:
-        left_vtx, left_fun = calc_lane_vertices(left_points, 100, image.shape[0])
+        left_vtx, left_fun = calc_lane_vertices(left_points, 250, image.shape[0])
         leftDegree = math.atan2(left_vtx[1][0]-left_vtx[0][0], left_vtx[1][1] - left_vtx[0][1]) * 180 / 3.14
         cv2.line(image, left_vtx[0], left_vtx[1], (255,0,0), 10)
     except :
         status = "left"
         # print("can't find line left")
     try:
-        right_vtx, right_fun = calc_lane_vertices(right_points, 100, image.shape[0])
+        right_vtx, right_fun = calc_lane_vertices(right_points, 250, image.shape[0])
         rightDegree = math.atan2(right_vtx[1][0]-right_vtx[0][0], right_vtx[1][1] - right_vtx[0][1]) * 180 / 3.14
         cv2.line(image, right_vtx[0], right_vtx[1], (255,0,0), 10)
     except :
