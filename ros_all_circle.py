@@ -236,10 +236,10 @@ class MinimalSubscriber(Node):
             if self.cwQueue.empty():
                 return
             instruction = self.cwQueue.get()
-            if instruction == "cw 3" or instruction == "cw -3":
-                print("30 yet",instruction)
-                if self.cwCount > 30:
-                    return
+            # if instruction == "cw 3" or instruction == "cw -3":
+            #     print("30 yet",instruction)
+            #     if self.cwCount > 10:
+            #         return
             self.cwQueue.put(instruction)
             self.sendRequest(instruction)
             # self.cwSwitch = True
@@ -398,13 +398,14 @@ class MinimalSubscriber(Node):
                                 print("cwed")
                                 self.cwCount = 0
                                 # self.cwSwitch = True
-                                # self.cwQueue.put(result_edge)
+                                self.cwQueue.put(result_edge)
                                 self.future = self.sendRequest(result_edge, False)
                                 return
                             else:
                                 self.cwCount = self.cwCount + 1
-                                return
                                 print(self.cwCount)
+                                self.sendRequest("rc 0 0 0 0")
+                                return
                         self.future = self.sendRequest(result_edge, False)
                         # self.keep = False
                         # self.action_future = False
