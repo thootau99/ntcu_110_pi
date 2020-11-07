@@ -244,7 +244,7 @@ def imageDegreeCheck(image, mode):
         rx = 0
         # return image, "rc -10 0 0 0", status
     if status == "left":
-        if rightDegree < 33 and rightDegree > 0.7:
+        if rightDegree < 33 and rightDegree > -4:
             status = "notrealleft"
             # print(rightDegree, status)
 
@@ -259,7 +259,7 @@ def imageDegreeCheck(image, mode):
                 status = "error"
                 result = "rc 0 0 0 0"
                 return image, result, status
-            if leftDegree > -3:
+            if leftDegree > -5:
                 status = "right"
                 result = "rc 10 0 0 0"
             else:
@@ -280,6 +280,14 @@ def imageDegreeCheck(image, mode):
         status = "error"
         result = "rc 0 0 0 0"
         return image, result, status
+
+    if leftDegree < -80 or rightDegree > 80:
+        print("error")
+        cv2.putText(image, "error", (left_vtx[0][0], left_vtx[0][1]-60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 1, cv2.LINE_AA, False)
+        status = "error"
+        result = "rc 0 0 0 0"
+        return image, result, status
+    
     print('slope', left_slope+right_slope)
     lr_slope= int(left_slope+right_slope)
     
@@ -315,17 +323,25 @@ def imageDegreeCheck(image, mode):
     if lr_slope <= 1 and lr_slope >= -1:
         pass
     elif center < line_center:
-        distanceToCenter = abs(distanceToCenter)
-        if distanceToCenter > 10:
+        # distanceToCenter = abs(distanceToCenter)
+        if distanceToCenter >= 7:
             status = "lefttoomuch "+str(distanceToCenter)
             result = "rc 10 0 0 0"
             return image, result, status
     elif center > line_center:
-        distanceToCenter = abs(distanceToCenter)
-        if distanceToCenter > 10:
+        # distanceToCenter = abs(distanceToCenter)
+        if distanceToCenter <= 7:
             status = "righttoomuch " +str(distanceToCenter) 
             result = "rc -10 0 0 0"
             return image, result, status
+    else:
+        if distanceToCenter < 30:
+            result = "rc 10 0 0 0"
+            return image, result, status
+        elif distanceToCenter < -30:
+            result = "rc -10 0 0 0"
+            return image, result, status
+            
     print("centered")
     # print(center, line_center)
 
@@ -333,13 +349,18 @@ def imageDegreeCheck(image, mode):
         _centerDegree = abs(centerDegree)
         dx = left_mean-right_mean
         print(centerDegree)
-        if dx > 15:
-            if centerDegree < 0:
+        if dx > 20:
+            if distanceToCenter <= 0 or centerDegree <= 0:
                 result = "cw -3"
             else:
                 result = "cw 3"
         else:
-            result = "cw 0"
+            if distanceToCenter < -15:
+                result = "cw -3"
+            elif distanceToCenter > 15:
+                result = "cw 3"
+            else:
+                result = "cw 0"
             # print("cw 0")
             
 
@@ -348,8 +369,8 @@ def imageDegreeCheck(image, mode):
 
         dx = right_mean-left_mean
 
-        if dx > 15:
-            if centerDegree < 0:
+        if dx > 20:
+            if distanceToCenter <= 0:
                 result = "cw -3"
             else:
                 result = "cw 3"
@@ -358,7 +379,12 @@ def imageDegreeCheck(image, mode):
         #     result = "cw "+str(centerDegree)
         #     print(result)
         else:
-            result = "cw 0"
+            if distanceToCenter < -15:
+                result = "cw -3"
+            elif distanceToCenter > 15:
+                result = "cw 3"
+            else:
+                result = "cw 0"
     
     return image, result, status
 # im = cv2.imread("test5.png")
@@ -372,7 +398,7 @@ def imageDegreeCheck(image, mode):
 # cv2.waitKey(0)
 #TODO: how to calc the total? 
 
-# cap = cv2.VideoCapture('output_1107.avi')
+# cap = cv2.VideoCapture('outputqw.avi')
 # lx = 0
 # rx = 0
 # while(cap.isOpened()):
