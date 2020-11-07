@@ -34,8 +34,8 @@ def clean_lines(lines, threshold):
 
 def select_white_yellow(image):
     # yellow color mask
-    lower = np.uint8([ 25,  50, 101])
-    upper = np.uint8([ 44, 255, 222])
+    lower = np.uint8([ 25,  37, 156])
+    upper = np.uint8([ 34, 255, 255])
     yellow_mask = cv2.inRange(image, lower, upper)
     # combine the mask
     # mask = cv2.bitwise_or(white_mask, yellow_mask)
@@ -80,9 +80,6 @@ def hough_lines(image):
 
 def imageDegreeCheck(image, mode):
     hsv = cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
-    
-    low_yellow = np.array([25, 37 ,101]) # 17, 50 ,101
-    high_yellow = np.array([40,255,222]) # 31, 255 ,222
     mask_hsv = select_white_yellow(hsv)
     kernel_size = 7
     gray = convert_gray_scale(mask_hsv)
@@ -93,6 +90,10 @@ def imageDegreeCheck(image, mode):
     masked_edges = select_region(edges)
 
 
+    cv2.startWindowThread()
+    cv2.namedWindow("456")
+    cv2.imshow("456", mask_hsv)
+    cv2.waitKey(1)
 
     cv2.startWindowThread()
     cv2.namedWindow("123")
@@ -324,13 +325,12 @@ def imageDegreeCheck(image, mode):
 #     cap.set(cv2.CAP_PROP_FPS, 10)
 #     ret, frame = cap.read()
 #     im, result,status = imageDegreeCheck(frame, 'go')
-
+#     print(result, status)
 #     cv2.imshow('frame',im   )
-#     key = cv2.waitKey(20)
-#     if cv2.waitKey(20) & 0xFF == ord('q'):
+#     key = cv2.waitKey(10)
+#     if cv2.waitKey(10) & 0xFF == ord('q'):
 #         break
 #     if key == ord('p'):
 #         cv2.waitKey(-1)
-
 # cap.release()
 # cv2.destroyAllWindows()
