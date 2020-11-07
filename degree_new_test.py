@@ -118,65 +118,87 @@ def imageDegreeCheck(image, mode):
         pass
 
     for line in lines:
-            for x1,y1,x2,y2 in line:
-                cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
-                # if x2==x1:
-                #     continue # ignore a vertical line
-                slope = (y2-y1)/(x2-x1)
-                intercept = y1 - slope*x1
-                cv2.putText(line_image, str(slope), (x1, y1-20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1, cv2.LINE_AA, False)
+        for x1,y1,x2,y2 in line:
+            cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
+            # if x2==x1:
+            #     continue # ignore a vertical line
+            slope = (y2-y1)/(x2-x1)
+            intercept = y1 - slope*x1
+            cv2.putText(line_image, str(slope), (x1, y1-20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1, cv2.LINE_AA, False)
 
-                if slope < 0: # y is reversed in image
-                    left_lines.append(line)
-                    # print(line)
-                    left_lines_start.append(x1)
-                else:
-                    right_lines.append(line)
-                    right_lines_start.append(x1)
-            left_lines_start_mean = np.mean(left_lines_start)
-            right_lines_start_mean = np.mean(right_lines_start)
-
-            for start in left_lines_start:
-                s = right_lines_start_mean - start
-                # print(s)
-                if s < 10:
-                    # print("poping same left",s)
-                    index = left_lines_start.index(start)
-                    # print(index, left_lines, left_lines_start)
+            if slope < 0: # y is reversed in image
+                left_lines.append(line)
+                # print(line)
+                left_lines_start.append(x1)
+            else:
+                right_lines.append(line)
+                right_lines_start.append(x1)
+        left_lines_start_mean = np.mean(left_lines_start)
+        right_lines_start_mean = np.mean(right_lines_start)
+    count = 0
+    for start in left_lines_start:
+        s = right_lines_start_mean - start
+        # print(s)
+        if s < 10:
+            # print("poping same left",s)
+            index = left_lines_start.index(start)
+            # print(index, left_lines, left_lines_start)
+            try:
+                right_lines_start.append(left_lines_start[index])
+                right_lines.append(left_lines[index])
+                left_lines_start.pop(index)
+                left_lines.pop(index)
+            except:
+                pass
+    count = 0
+    for start in right_lines_start:
+        s = right_lines_start_mean - start
+        # print(s)
+        if s > 10:
+            # print("poping same left",s)
+            index = right_lines_start.index(start)
+            # print(index, left_lines, left_lines_start)
+            try:
+                left_lines_start.append(right_lines_start[index])
+                left_lines.append(right_lines[index])
+                right_lines_start.pop(index)
+                right_lines.pop(index)
+            except:
+                pass
+    if len(left_lines) == 0 and len(right_lines) != 0:
+        if len(right_lines) == 1:
+            pass
+        else:
+            count = 0
+            for index, right_mean in enumerate(right_lines_start):
+                if right_mean - right_lines_start_mean < -50:
+                    # print("switch right to left", right_mean, right_lines[index])
+                    # if index == len(right_lines):
+                    #     break
                     try:
-                        left_lines_start.pop(index)
-                        left_lines.pop(index)
+                        
+                        left_lines.append(right_lines[index-count])
+                        right_lines.pop(index-count)
+                        count = count + 1
                     except:
                         pass
-            if len(left_lines) == 0 and len(right_lines) != 0:
-                if len(right_lines) == 1:
-                    pass
-                else:
-                    for index, right_mean in enumerate(right_lines_start):
-                        if right_mean - right_lines_start_mean < -50:
-                            # print("switch right to left", right_mean, right_lines[index])
-                            if index == len(right_lines):
-                                break
-                            try:
-                                left_lines.append(right_lines[index])
-                                right_lines.pop(index)
-                            except:
-                                pass
-            if len(right_lines) == 0 and len(left_lines) != 0:
-                if len(left_lines) == 1:
-                    pass
-                else:
-                    for index, left_mean in enumerate(left_lines_start):
-                        if left_mean - left_lines_start_mean > 50:
-                            # print("switch right to left", left_mean, left_lines[index])
-                            if index == len(left_lines):
-                                break
-                            try:
-                                right_lines.append(left_lines[index])
-                                left_lines.pop(index)
-                            except:
-                                pass
-            # print(left_lines, right_lines)
+    if len(right_lines) == 0 and len(left_lines) != 0:
+        if len(left_lines) == 1:
+            pass
+        else:
+            count = 0
+            for index, left_mean in enumerate(left_lines_start):
+                if left_mean - left_lines_start_mean > 50:
+                    # print("switch right to left", left_mean, left_lines[index])
+                    if index == len(left_lines):
+                        break
+                    try:
+                        right_lines.append(left_lines[index-count])
+                        left_lines.pop(index-count)
+                        count = count + 1
+                    except:
+                        pass
+    # print(left_lines, right_lines)
             
             
 
@@ -222,7 +244,7 @@ def imageDegreeCheck(image, mode):
         rx = 0
         # return image, "rc -10 0 0 0", status
     if status == "left":
-        if rightDegree < 33 and rightDegree > 10:
+        if rightDegree < 33 and rightDegree > 0.7:
             status = "notrealleft"
             # print(rightDegree, status)
 
@@ -237,7 +259,7 @@ def imageDegreeCheck(image, mode):
                 status = "error"
                 result = "rc 0 0 0 0"
                 return image, result, status
-            if leftDegree > 10:
+            if leftDegree > -3:
                 status = "right"
                 result = "rc 10 0 0 0"
             else:
@@ -252,8 +274,8 @@ def imageDegreeCheck(image, mode):
         result = "rc 0 22 0 0"
         return image, result, status
     
-    if abs(left_vtx[0][0] - right_vtx[0][0]) <= 4:
-        # print("error here", left_vtx, right_vtx, left_vtx[0][0] - right_vtx[0][0])
+    if abs(left_vtx[1][0] - right_vtx[1][0]) <= 4:
+        print("error here", left_vtx, right_vtx, left_vtx[0][0] - right_vtx[0][0])
         cv2.putText(image, "error", (left_vtx[0][0], left_vtx[0][1]-60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 1, cv2.LINE_AA, False)
         status = "error"
         result = "rc 0 0 0 0"
@@ -350,20 +372,20 @@ def imageDegreeCheck(image, mode):
 # cv2.waitKey(0)
 #TODO: how to calc the total? 
 
-cap = cv2.VideoCapture('output_1107.avi')
-lx = 0
-rx = 0
-while(cap.isOpened()):
-    cap.set(cv2.CAP_PROP_FPS, 10)
-    ret, frame = cap.read()
-    im, result,status = imageDegreeCheck(frame, 'go')
+# cap = cv2.VideoCapture('output_1107.avi')
+# lx = 0
+# rx = 0
+# while(cap.isOpened()):
+#     cap.set(cv2.CAP_PROP_FPS, 10)
+#     ret, frame = cap.read()
+#     im, result,status = imageDegreeCheck(frame, 'go')
     
-    print(result, status)
-    cv2.imshow('frame',im)
-    key = cv2.waitKey(10)
-    if cv2.waitKey(10) & 0xFF == ord('q'):
-        break
-    if key == ord('p'):
-        cv2.waitKey(-1)
-cap.release()
-cv2.destroyAllWindows()
+#     print(result, status)
+#     cv2.imshow('frame',im)
+#     key = cv2.waitKey(10)
+#     if cv2.waitKey(10) & 0xFF == ord('q'):
+#         break
+#     if key == ord('p'):
+#         cv2.waitKey(-1)
+# cap.release()
+# cv2.destroyAllWindows()
