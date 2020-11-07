@@ -125,7 +125,7 @@ def imageDegreeCheck(image, mode):
                 slope = (y2-y1)/(x2-x1)
                 intercept = y1 - slope*x1
                 cv2.putText(line_image, str(slope), (x1, y1-20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1, cv2.LINE_AA, False)
-                # length = np.sqrt((y2-y1)**2+(x2-x1)**2)
+
                 if slope < 0: # y is reversed in image
                     left_lines.append(line)
                     # print(line)
@@ -138,8 +138,9 @@ def imageDegreeCheck(image, mode):
 
             for start in left_lines_start:
                 s = right_lines_start_mean - start
+                # print(s)
                 if s < 10:
-                    # print("poping same left")
+                    # print("poping same left",s)
                     index = left_lines_start.index(start)
                     # print(index, left_lines, left_lines_start)
                     try:
@@ -153,22 +154,30 @@ def imageDegreeCheck(image, mode):
                 else:
                     for index, right_mean in enumerate(right_lines_start):
                         if right_mean - right_lines_start_mean < -50:
-
+                            # print("switch right to left", right_mean, right_lines[index])
                             if index == len(right_lines):
                                 break
-                            left_lines.append(right_lines[index])
-                            right_lines.pop(index)
-                            
+                            try:
+                                left_lines.append(right_lines[index])
+                                right_lines.pop(index)
+                            except:
+                                pass
             if len(right_lines) == 0 and len(left_lines) != 0:
                 if len(left_lines) == 1:
                     pass
                 else:
                     for index, left_mean in enumerate(left_lines_start):
                         if left_mean - left_lines_start_mean > 50:
+                            # print("switch right to left", left_mean, left_lines[index])
                             if index == len(left_lines):
                                 break
-                            right_lines.append(left_lines[index])
-                            left_lines.pop(index)
+                            try:
+                                right_lines.append(left_lines[index])
+                                left_lines.pop(index)
+                            except:
+                                pass
+            # print(left_lines, right_lines)
+            
             
 
     cv2.startWindowThread()
@@ -193,7 +202,9 @@ def imageDegreeCheck(image, mode):
     try:
         left_vtx, left_fun = calc_lane_vertices(left_points, 100, image.shape[0])
         leftDegree = math.atan2(left_vtx[1][0]-left_vtx[0][0], left_vtx[1][1] - left_vtx[0][1]) * 180 / 3.14
+        left_slope = (left_vtx[1][1]-left_vtx[0][1])/(left_vtx[1][0]-left_vtx[0][0])
         cv2.line(image, left_vtx[0], left_vtx[1], (255,0,0), 10)
+        cv2.putText(image, str(left_slope), (left_vtx[0][0], left_vtx[0][1]-20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1, cv2.LINE_AA, False)
         lx = left_vtx[1][0]
     except :
         status = "left"
@@ -201,15 +212,20 @@ def imageDegreeCheck(image, mode):
     try:
         right_vtx, right_fun = calc_lane_vertices(right_points, 100, image.shape[0])
         rightDegree = math.atan2(right_vtx[1][0]-right_vtx[0][0], right_vtx[1][1] - right_vtx[0][1]) * 180 / 3.14
+        right_slope = (right_vtx[1][1]-right_vtx[0][1])/(right_vtx[1][0]-right_vtx[0][0])
         cv2.line(image, right_vtx[0], right_vtx[1], (255,0,0), 10)
+        cv2.putText(image, str(right_slope), (right_vtx[0][0], right_vtx[0][1]-20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1, cv2.LINE_AA, False)
+
         rx = right_vtx[1][0]
     except :
         status = status + "right"
         rx = 0
         # return image, "rc -10 0 0 0", status
     if status == "left":
-        if rightDegree < 33:
+        if rightDegree < 33 and rightDegree > 10:
             status = "notrealleft"
+            # print(rightDegree, status)
+
             result = "rc 10 0 0 0"
         else:
             status = "left"
@@ -235,12 +251,21 @@ def imageDegreeCheck(image, mode):
     elif status == "leftright":
         result = "rc 0 22 0 0"
         return image, result, status
-
     
+    if abs(left_vtx[0][0] - right_vtx[0][0]) <= 4:
+        print("error here", left_vtx, right_vtx, left_vtx[0][0] - right_vtx[0][0])
+        cv2.putText(image, "error", (left_vtx[0][0], left_vtx[0][1]-20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1, cv2.LINE_AA, False)
+        status = "error"
+        if mode == "go":
+            result = "rc 10 0 0 0"
+        elif mode == "back":
+            result = "rc -10 0 0 0"
+        return image, result, status
+    print('slope', left_slope+right_slope)
+    # print(left_length, right_length)
     leftMainasRight = leftDegree - rightDegree
     leftMainasRight = int(leftMainasRight)
-    if leftMainasRight < 0 and leftMainasRight > -5:
-        print(leftMainasRight, leftDegree, rightDegree)
+    # print(leftMainasRight, leftDegree, rightDegree)
     line_center = int((left_vtx[1][0] + right_vtx[1][0]) / 2)
     line_center_top = int((left_vtx[0][0] + right_vtx[0][0]) / 2)
     center = int(image.shape[1] / 2)
@@ -250,15 +275,17 @@ def imageDegreeCheck(image, mode):
     left_top = line_center - left_fun(top)
     right_bottom = right_vtx[1][0] - line_center
     right_top = right_fun(top) - line_center
-    
     left_total = ((left_bottom + left_top) * realTop) / 2
     right_total = ((right_bottom + right_top) * realTop) / 2
     mean= (left_total+right_total) / 2
     left_mean = left_total/mean*100
     right_mean = right_total/mean*100
     distanceToCenter = line_center - center
-    cv2.line(image, (line_center, 0), (line_center_top, image.shape[1]), (0, 0, 255), 5)
-    centerDegree = int(math.atan2(line_center_top-line_center, image.shape[1]) * 180 / 3.14)
+    # cv2.line(image, (line_center, 0), (line_center_top, image.shape[1]), (0, 0, 255), 5)
+    cv2.line(image, (line_center, image.shape[1]), (line_center_top, 0), (0, 0, 255), 5)
+    centerDegree = int(math.atan2(line_center_top-line_center, 0) * 180 / 3.14)
+    center_slope = (0 - image.shape[1])/(line_center_top-line_center)
+    print("center slope", center_slope)
     cv2.line(image, (center, 0), (center, image.shape[0]), (0, 0, 0), 5)
     if center < line_center:
         distanceToCenter = abs(distanceToCenter)
@@ -272,39 +299,37 @@ def imageDegreeCheck(image, mode):
             result = "rc -10 0 0 0"
             return image, result, status
     print("centered")
-    print(center, line_center)
+    # print(center, line_center)
 
     if left_mean > right_mean:
-        centerDegree = abs(centerDegree)
+        _centerDegree = abs(centerDegree)
         dx = left_mean-right_mean
         if dx > 15:
-            if center > line_center:
-                result = "cw -"+ str(centerDegree)
+            if centerDegree < 0:
+                result = "cw -3"
             else:
-                result = "cw "+str(centerDegree)
+                result = "cw 3"
         else:
             result = "cw 0"
             # print("cw 0")
             
 
     else:
-        centerDegree = abs(centerDegree)
+        _centerDegree = abs(centerDegree)
 
         dx = right_mean-left_mean
 
         if dx > 15:
-            if center > line_center:
-                result = "cw -"+ str(centerDegree)
+            if centerDegree < 0:
+                result = "cw -3"
             else:
-                result = "cw "+str(centerDegree)
+                result = "cw 3"
              
         # elif dx > 15 and mode == "go":
         #     result = "cw "+str(centerDegree)
         #     print(result)
         else:
             result = "cw 0"
-            
-    print(result)
     
     return image, result, status
 # im = cv2.imread("test5.png")
@@ -318,15 +343,16 @@ def imageDegreeCheck(image, mode):
 # cv2.waitKey(0)
 #TODO: how to calc the total? 
 
-# cap = cv2.VideoCapture('outputqw.avi')
+# cap = cv2.VideoCapture('output_1107.avi')
 # lx = 0
 # rx = 0
 # while(cap.isOpened()):
 #     cap.set(cv2.CAP_PROP_FPS, 10)
 #     ret, frame = cap.read()
 #     im, result,status = imageDegreeCheck(frame, 'go')
+    
 #     print(result, status)
-#     cv2.imshow('frame',im   )
+#     cv2.imshow('frame',im)
 #     key = cv2.waitKey(10)
 #     if cv2.waitKey(10) & 0xFF == ord('q'):
 #         break

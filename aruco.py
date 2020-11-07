@@ -60,7 +60,7 @@ def aru(frame):
                 transpose_tvec = tvec[np.newaxis, :].T
                 proj_matrix = np.hstack((rvec_matrix, transpose_tvec))
                 eular_angle = rotationVectorToEulerAngles(rvec)
-                print(eular_angle)
+                # print(eular_angle)
                 # euler_angle = cv2.decomposeProjectionMatrix(proj_matrix)[6] # [deg]
                 # print("x : " + str(tvec[0]))
                 # print("y : " + str(tvec[1]))

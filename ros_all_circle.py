@@ -86,6 +86,7 @@ class MinimalSubscriber(Node):
         self.CY = 360   # 大約在畫面中間的 Y 座標
         self.xulyframe = 0
         self.future = 0
+        self.cwCount = 0
         self.successconb = False
         self.action_future = False
         self.face_locations = [] # 存解析輸入圖片後人臉的位置
@@ -134,22 +135,6 @@ class MinimalSubscriber(Node):
         self.combError = 0
         self.mode = ''
         l = locals()
-                    # if abs(aru_deg[index][0]) > 150 and abs(aru_deg[index][0]) < 168:
-                    #     aru_deg[index][0] = abs(aru_deg[index][0])
-                    #     print(aru_deg[index][0], "deg absed")
-
-                    
-                    # if aru_deg[index][0] < -90 and aru_deg[index][0] > -150:
-                    #     instruction = ['rc', '0', '0', '0', '0']
-                    #     instruction[4] = "-10"
-                    #     instruction[2] = "-3"
-                    #     print(aru_deg[index][0], "deg qua left")
-
-                    # elif aru_deg[index][0] > 90 and aru_deg[index][0] < 150:
-                    #     instruction = ['rc', '0', '0', '0', '0']
-                    #     instruction[4] = '10'
-                    #     instruction[2] = '-3'
-                    #     print(aru_deg[index][0], "deg qua right")
 
         for item in self.names: # ! 讀取在 dataset_img 下的全部圖片
             l['%s_image'%item] = face_recognition.load_image_file("dataset_img/%s.jpg"%item)
@@ -222,6 +207,7 @@ class MinimalSubscriber(Node):
         self.aruLockCode = mode
     def heightCallback(self, data):
         self.battery = str(data.bat)
+        self.yaw = str(data.yaw)
         if self.yawWrite:
             self.yaw = data.yaw
 
@@ -249,14 +235,20 @@ class MinimalSubscriber(Node):
             print(self.cwQueue.empty(), self.cwQueue.qsize())
             if self.cwQueue.empty():
                 return
-            instruction = self.cwQueue.get() 
-            print(instruction)
+            instruction = self.cwQueue.get()
+            if instruction == "cw 3" or instruction == "cw -3":
+                print("30 yet",instruction)
+                if self.cwCount > 30:
+                    return
             self.cwQueue.put(instruction)
             self.sendRequest(instruction)
+            # self.cwSwitch = True
         else:
             if self.cwQueue.empty():
+                # self.cwSwitch = False
                 return
             else:
+                # self.cwSwitch = False
                 instruction = self.cwQueue.get()
                 # if instruction == "battery?":
                 #     self.battery = str(data.str)
@@ -270,7 +262,7 @@ class MinimalSubscriber(Node):
         
         if self.landautien:
             self.landautien = False
-            self.action_future = True
+            # self.action_future = True
             self.yawWrite = True
             
         rgb_small_frame = small_frame[:, :, ::-1] # 轉換成 face_recognition 的格式
@@ -290,7 +282,9 @@ class MinimalSubscriber(Node):
         # else:
         #     self.batteryCount = self.batteryCount + 1
         batteryStr = "battery: " + self.battery
-        cv2.putText(small_frame, batteryStr, (0,20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
+        yawStr = "yaw: " + str(self.yaw)
+        statusText = batteryStr + yawStr
+        cv2.putText(small_frame, statusText, (0,20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
 
         cv2.startWindowThread()
         cv2.namedWindow("preview")
@@ -324,43 +318,69 @@ class MinimalSubscriber(Node):
             if not self.successconb:
                 # if self.aruGoMode == "go": 
                 _, result_edge, status = imageDegreeCheck(cv_image, self.aruGoMode)
-                print(status, self.noLineStatus)
+                print(status, self.noLineStatus, self.noLineInstruction)
+                if status != "":
+                    if status == "lefttoomuch":
+                        self.noLineStatus = ""
+                        self.noLineInstruction = ""
+                    if status == "righttoomuch":
+                        self.noLineStatus = ""
+                        self.noLineInstruction = ""
+                    if status == 'notrealleft':
+                        if self.noLineStatus == "left":
+                            self.noLineStatus = 'notrealleft'
+                            self.noLineInstruction = "rc 10 0 0 0"
+                        self.noLineStatus = 'notrealleft'
+                        self.noLineInstruction = "rc 10 0 0 0"
+                    if status == 'left':
+                        if self.noLineInstruction == 'notrealleft':
+                            self.noLineStatus = 'notrealleft'
+                            # self.noLineInstruction = "rc 10 0 0 0"
+
+                        else:
+                            self.noLineStatus = 'left'
+                            # self.noLineInstruction = 'rc -10 0 0 0'
+                        # return
+                    if status == 'right':
+                        if self.noLineStatus == "notrealright":
+                            self.noLineStatus = "notrealright"
+                            # self.noLineInstruction = "rc -10 0 0 0"
+                        else:
+                            self.noLineStatus = "right"
+                            # self.noLineInstruction = "rc 10 0 0 0"
+                        # return
+                    if status == "notrealright":
+                        # print(self.aruGoMode)
+                        if self.aruGoMode == "go":
+                            self.noLineStatus = "notrealleft"
+                            self.noLineInstruction = "rc 10 0 0 0"
+                        else:    
+                            self.noLineStatus = "notrealright"
+                            self.noLineInstruction = "rc -10 0 0 0"
+                        # return
+                    
                 if self.noLineStatus != "":
+                    
                     if status == "":
                         self.noLineStatus = ""
                         self.noLineInstruction = ""
                     else:
+                        print("entered")
+                        if self.noLineStatus == "left" or self.noLineStatus == "notrealright":
+                            if self.aruGoMode == "go" and self.noLineStatus == "notrealright":
+                                self.noLineStatus = "notrealleft"
+                            self.noLineInstruction = "rc -10 0 0 0"
+                        
+                        if self.noLineStatus == "right" or self.noLineStatus == "notrealleft":
+                            self.noLineInstruction = "rc 10 0 0 0"
                         self.sendRequest(self.noLineInstruction)
                         return
-                if status != "":
-                    if status == 'left':
-                        if self.noLineInstruction == 'notrealleft':
-                            pass
-                        else:
-                            self.noLineStatus = 'left'
-                            self.noLineInstruction = 'rc -10 0 0 0'
-                    elif status == 'notrealleft':
-                    #     if self.noLineStatus == "left"
-                    #         self.noLineStatus = 'notrealleft'
-                    #         self.noLineInstruction = "rc 10 0 0 0"
-                        self.noLineStatus = 'notrealleft'
-                        self.noLineInstruction = "rc 10 0 0 0"
-                    elif status == 'right':
-                        if self.noLineStatus == "notrealright":
-                            pass
-                        else:
-                            self.noLineStatus = "right"
-                            self.noLineInstruction = "rc 10 0 0 0"
-                    elif status == "notrealright":
-                        self.noLineStatus = "notrealright"
-                        self.noLineInstruction = "rc -10 0 0 0"
-                    return
-                
                 if result_edge == 0:
                     print('conb failed')
                     return
                 else:
                     self.successconb = True
+                    print(status, result_edge)
                     if result_edge == "" or result_edge == "cw 0":
                         if self.cwSwitch:
                             return
@@ -373,8 +393,18 @@ class MinimalSubscriber(Node):
                             self.aruBeLock("forward", True)
                     else:
                         if "cw" in result_edge:
-                            self.cwSwitch = True
-                            self.cwQueue.put(result_edge)
+                            print("self.cwCount", self.cwCount)
+                            if self.cwCount > 10:
+                                print("cwed")
+                                self.cwCount = 0
+                                # self.cwSwitch = True
+                                # self.cwQueue.put(result_edge)
+                                self.future = self.sendRequest(result_edge, False)
+                                return
+                            else:
+                                self.cwCount = self.cwCount + 1
+                                return
+                                print(self.cwCount)
                         self.future = self.sendRequest(result_edge, False)
                         # self.keep = False
                         # self.action_future = False
@@ -383,7 +413,7 @@ class MinimalSubscriber(Node):
                         #     print("far target")
                         #     self.aruBeLock("forward", True)
                         return
-                    print(result_edge)
+                    # print(result_edge)
         # print(self.combError)
         # if r != "cw 0" or r != "":
         #     self.combError = self.combError + 1
@@ -392,17 +422,17 @@ class MinimalSubscriber(Node):
         if s != "":
             try:
                 save = s.split(' ')
-                print(save)
-                if save[0] == "lefttoomuch" or save[0] == "righttoomuch":
-                    if int(save[1]) > 100:
-                        if save[0] == "lefttoomuch":
-                            self.sendRequest("cw 3")
-                            self.cwQueue.put("cw 3")
-                            return
-                        elif save[0] == "righttoomuch":
-                            self.sendRequest("cw -3")
-                            self.cwQueue.put("cw -3")
-                            return
+                # # print(save)
+                # if save[0] == "lefttoomuch" or save[0] == "righttoomuch":
+                #     if int(save[1]) > 100:
+                #         if save[0] == "lefttoomuch":
+                #             self.sendRequest("cw 3")
+                #             self.cwQueue.put("cw 3")
+                #             return
+                #         elif save[0] == "righttoomuch":
+                #             self.sendRequest("cw -3")
+                #             self.cwQueue.put("cw -3")
+                #             return
             except:
                 pass
         if self.landautien:
@@ -412,9 +442,9 @@ class MinimalSubscriber(Node):
         #     self.landautien = False600
 
         
-        if self.cwSwitch:
-            self.action_future = True
-            return
+        # if self.cwSwitch:
+        #     self.action_future = True
+        #     return
         
 
         if self.aruLock:
@@ -497,7 +527,7 @@ class MinimalSubscriber(Node):
                         self.aruBeLock('', False)
                 elif ids[0] not in self.aruFar:
                     self.aruBeLock('', False)
-                if ids[0] == 2 and self.aruTarget == 2:
+                if (ids[0] == 2 and self.aruTarget == 2) or (ids[0] == 6 and self.aruTarget == 6):
                     self.aruBound = [130,400]
                 elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'go':
                     self.aruBound = [120,130]
@@ -594,38 +624,22 @@ class MinimalSubscriber(Node):
                             self.aruLocation['bottom'] = False
                             self.aruLocation['top'] = False
 
-                    # if abs(aru_deg[index][0]) > 150 and abs(aru_deg[index][0]) < 168:
-                    #     aru_deg[index][0] = abs(aru_deg[index][0])
-                    #     print(aru_deg[index][0], "deg absed")
 
                     
                             self.scannedArucoCode.append(0)
-                    # if aru_deg[index][0] < -90 and aru_deg[index][0] > -150:
-                    #     instruction = ['rc', '0', '0', '0', '0']
-                    #     instruction[4] = "-10"
-                    #     instruction[2] = "-3"
-                    #     print(aru_deg[index][0], "deg qua left")
-
-                    # elif aru_deg[index][0] > 90 and aru_deg[index][0] < 150:
-                    #     instruction = ['rc', '0', '0', '0', '0']
-                    #     instruction[4] = '10'
-                    #     instruction[2] = '-3'
-                    #     print(aru_deg[index][0], "deg qua right")
-
+                 
                     ins = ' '.join(instruction)
                     self.sendRequest(ins)
                 elif not align:
                     print("z aligned")
                     self.aruBeLock('false', 'back')
                     if aru_x[index] < -0.06 and not side:
-                        # print("qua left")
                         instruction[1] = '-13'
                         if self.locationFixed:
 
                             self.aruLocation['left'] = True
                             self.aruLocation['right'] = False
                     elif aru_x[index] > 0.3 and not side:
-                        # print("qua right")
                         instruction[1] = '13'
                         if self.locationFixed:
 
@@ -663,7 +677,6 @@ class MinimalSubscriber(Node):
                     else:
                         ins = ' '.join(instruction)
                         self.sendRequest(ins)
-                # print(ids[0], aru_distance[index])
                 if align:
                     if ids[0] == 0 and self.aruTarget == 0 and self.aruGoMode == 'go':
                         if aru_distance[index] < self.aruBound[1]:
@@ -983,7 +996,6 @@ class MinimalSubscriber(Node):
                 #     if matches[best_match_index]:
                 #         name = self.known_face_names[best_match_index]
                 #     name = name.split('_')
-                #     print(name)
                 #     name = name[0]
 
                 # determine the class label and color we'll use to draw
