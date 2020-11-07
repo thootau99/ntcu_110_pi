@@ -314,8 +314,11 @@ class MinimalSubscriber(Node):
             self.futureInstruction = ""
             return
         _, r, s = imageDegreeCheck(cv_image, self.aruGoMode)
-        if "cw" in r:
-            print("cw", r)
+        try:
+            if "cw" in r:
+                print("cw", r)
+        except:
+            pass
         if self.action_future:
             self.successconb = False
             if not self.successconb:
