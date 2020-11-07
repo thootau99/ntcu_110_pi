@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import sys
 import math
+from scipy.spatial.transform import Rotation
 aruco = cv2.aruco #arucoライブラリ
 dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 
@@ -21,6 +22,10 @@ def drawCenter(frame, corners, w, h):
         cv2.line(frame, (int(w/2), int(h/2)), (cx, cy), (0,255,255), 3)
 
     return frame
+
+def rotationVectorToEulerAngles(rvec):
+    r = Rotation.from_rotvec(rvec)
+    return r.as_euler('xyz', degrees=True)
 
 def aru(frame):
     h, w = frame.shape[:2]
@@ -54,7 +59,9 @@ def aru(frame):
                 rvec_matrix = rvec_matrix[0]
                 transpose_tvec = tvec[np.newaxis, :].T
                 proj_matrix = np.hstack((rvec_matrix, transpose_tvec))
-                euler_angle = cv2.decomposeProjectionMatrix(proj_matrix)[6] # [deg]
+                eular_angle = rotationVectorToEulerAngles(rvec)
+                print(eular_angle)
+                # euler_angle = cv2.decomposeProjectionMatrix(proj_matrix)[6] # [deg]
                 # print("x : " + str(tvec[0]))
                 # print("y : " + str(tvec[1]))
                 # print("z : " + str(tvec[2]))

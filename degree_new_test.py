@@ -319,20 +319,20 @@ def imageDegreeCheck(image, mode):
 # cv2.waitKey(0)
 #TODO: how to calc the total? 
 
-cap = cv2.VideoCapture('outputqw.avi')
+# cap = cv2.VideoCapture('outputqw.avi')
 
-while(cap.isOpened()):
-    cap.set(cv2.CAP_PROP_FPS, 10)
-    ret, frame = cap.read()
-    im, result,status = imageDegreeCheck(frame, 'go')
-    print(status, result)
+# while(cap.isOpened()):
+#     cap.set(cv2.CAP_PROP_FPS, 10)
+#     ret, frame = cap.read()
+#     im, result,status = imageDegreeCheck(frame, 'go')
+#     print(status, result)
     
-    cv2.imshow('frame',im   )
-    key = cv2.waitKey(20)
-    if cv2.waitKey(20) & 0xFF == ord('q'):
-        break
-    if key == ord('p'):
-        cv2.waitKey(-1)
+#     cv2.imshow('frame',im   )
+#     key = cv2.waitKey(20)
+#     if cv2.waitKey(20) & 0xFF == ord('q'):
+#         break
+#     if key == ord('p'):
+#         cv2.waitKey(-1)
 
 # cap.release()
 # cv2.destroyAllWindows()
