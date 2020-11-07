@@ -119,47 +119,33 @@ def imageDegreeCheck(image, mode):
     for line in lines:
             for x1,y1,x2,y2 in line:
                 cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
-
-                if x2==x1:
-                    continue # ignore a vertical line
+                # if x2==x1:
+                #     continue # ignore a vertical line
                 slope = (y2-y1)/(x2-x1)
                 intercept = y1 - slope*x1
                 cv2.putText(line_image, str(slope), (x1, y1-20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1, cv2.LINE_AA, False)
                 # length = np.sqrt((y2-y1)**2+(x2-x1)**2)
                 if slope < 0: # y is reversed in image
                     left_lines.append(line)
+                    # print(line)
                     left_lines_start.append(x1)
                 else:
                     right_lines.append(line)
                     right_lines_start.append(x1)
-                # if x1 == x2:
-                #     continue
-                # angle = math.atan2(x2-x1, y2-y1)
-                # angle = angle * 180 / 3.14
-                # intangle = int(angle)
-                
-                # if (intangle < 178 and intangle > 135) or (intangle < 80 and intangle >= 4):
-                #     if intangle == 180:
-                #         continue
-                #     if intangle < 50 and intangle > 4:
-                #         right_lines.append(line)
-                #     else:
-                #         left_lines.append(line)
-                        # intangle = abs(intangle - 180)
-
-                # if (angle < 145 and angle > 100) or (intangle < 50 and intangle > 28):
-                #     # cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
-                #     left_angle_av = left_angle_av + angle
-                #     left_count = left_count + 1
-                # if (angle < 160 and angle > 145) or (intangle < 50 and intangle > 28):
-                #     # cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
-                #     right_angle_av = right_angle_av + angle
-                #     right_count = right_count + 1
-                #     cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
-            # left_lines_slope_mean = np.mean(left_lines_slope)
-            # right_lines_slope_mean = np.mean(right_lines_slope)
             left_lines_start_mean = np.mean(left_lines_start)
             right_lines_start_mean = np.mean(right_lines_start)
+
+            for start in left_lines_start:
+                s = right_lines_start_mean - start
+                if s < 10:
+                    # print("poping same left")
+                    index = left_lines_start.index(start)
+                    # print(index, left_lines, left_lines_start)
+                    try:
+                        left_lines_start.pop(index)
+                        left_lines.pop(index)
+                    except:
+                        pass
             if len(left_lines) == 0 and len(right_lines) != 0:
                 if len(right_lines) == 1:
                     pass
@@ -172,18 +158,18 @@ def imageDegreeCheck(image, mode):
                             left_lines.append(right_lines[index])
                             right_lines.pop(index)
                             
-
             if len(right_lines) == 0 and len(left_lines) != 0:
                 if len(left_lines) == 1:
                     pass
                 else:
                     for index, left_mean in enumerate(left_lines_start):
-                        if left_mean - left_lines_start_mean < 50:
+                        if left_mean - left_lines_start_mean > 50:
                             if index == len(left_lines):
                                 break
                             right_lines.append(left_lines[index])
                             left_lines.pop(index)
-                            
+            
+
     cv2.startWindowThread()
     cv2.namedWindow("ppaaaap")
     cv2.imshow("ppaaaap", line_image)
@@ -216,7 +202,6 @@ def imageDegreeCheck(image, mode):
     except :
         status = status + "right"
         # return image, "rc -10 0 0 0", status
-    
     if status == "left":
         if rightDegree < 33:
             status = "notrealleft"
@@ -245,6 +230,12 @@ def imageDegreeCheck(image, mode):
     
     elif status == "leftright":
         return image, result, status
+
+    
+    leftMainasRight = leftDegree - rightDegree
+    leftMainasRight = int(leftMainasRight)
+    if leftMainasRight < 0 and leftMainasRight > -5:
+        print(leftMainasRight, leftDegree, rightDegree)
     line_center = int((left_vtx[1][0] + right_vtx[1][0]) / 2)
     line_center_top = int((left_vtx[0][0] + right_vtx[0][0]) / 2)
     center = int(image.shape[1] / 2)
@@ -276,15 +267,16 @@ def imageDegreeCheck(image, mode):
             result = "rc -10 0 0 0"
             return image, result, status
     print("centered")
+    print(center, line_center)
+
     if left_mean > right_mean:
         centerDegree = abs(centerDegree)
         dx = left_mean-right_mean
-        if dx > 15 and mode == 'back':
-            result = "cw "+str(centerDegree)
-            
-        elif dx > 15 and mode == 'go':
-            result = "cw -"+str(centerDegree)
-            # print(result)
+        if dx > 15:
+            if center > line_center:
+                result = "cw -"+ str(centerDegree)
+            else:
+                result = "cw "+str(centerDegree)
         else:
             result = "cw 0"
             # print("cw 0")
@@ -296,8 +288,10 @@ def imageDegreeCheck(image, mode):
         dx = right_mean-left_mean
 
         if dx > 15:
-            result = "cw -"+str(centerDegree)
-            print(result)
+            if center > line_center:
+                result = "cw -"+ str(centerDegree)
+            else:
+                result = "cw "+str(centerDegree)
              
         # elif dx > 15 and mode == "go":
         #     result = "cw "+str(centerDegree)
@@ -319,20 +313,20 @@ def imageDegreeCheck(image, mode):
 # cv2.waitKey(0)
 #TODO: how to calc the total? 
 
-# cap = cv2.VideoCapture('outputqw.avi')
+cap = cv2.VideoCapture('outputqw.avi')
 
-# while(cap.isOpened()):
-#     cap.set(cv2.CAP_PROP_FPS, 10)
-#     ret, frame = cap.read()
-#     im, result,status = imageDegreeCheck(frame, 'go')
-#     print(status, result)
+while(cap.isOpened()):
+    cap.set(cv2.CAP_PROP_FPS, 10)
+    ret, frame = cap.read()
+    im, result,status = imageDegreeCheck(frame, 'go')
+    print(status, result)
     
-#     cv2.imshow('frame',im   )
-#     key = cv2.waitKey(20)
-#     if cv2.waitKey(20) & 0xFF == ord('q'):
-#         break
-#     if key == ord('p'):
-#         cv2.waitKey(-1)
+    cv2.imshow('frame',im   )
+    key = cv2.waitKey(20)
+    if cv2.waitKey(20) & 0xFF == ord('q'):
+        break
+    if key == ord('p'):
+        cv2.waitKey(-1)
 
-# cap.release()
-# cv2.destroyAllWindows()
+cap.release()
+cv2.destroyAllWindows()
