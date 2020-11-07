@@ -63,9 +63,9 @@ def select_region(image):
     # first, define the polygon by vertices
     rows, cols = image.shape[:2]
     bottom_left  = [cols*0.1, rows*0.95]
-    top_left     = [cols*0.1, rows*0.6]
+    top_left     = [cols*0.2, rows*0.6]
     bottom_right = [cols*0.9, rows*0.95]
-    top_right    = [cols*0.9, rows*0.6] 
+    top_right    = [cols*0.8, rows*0.6] 
     # the vertices are an array of polygons (i.e array of arrays) and the data type must be integer
     vertices = np.array([[bottom_left, top_left, top_right, bottom_right]], dtype=np.int32)
     return filter_region(image, vertices)
@@ -193,14 +193,18 @@ def imageDegreeCheck(image, mode):
         left_vtx, left_fun = calc_lane_vertices(left_points, 100, image.shape[0])
         leftDegree = math.atan2(left_vtx[1][0]-left_vtx[0][0], left_vtx[1][1] - left_vtx[0][1]) * 180 / 3.14
         cv2.line(image, left_vtx[0], left_vtx[1], (255,0,0), 10)
+        lx = left_vtx[1][0]
     except :
         status = "left"
+        lx = 0
     try:
         right_vtx, right_fun = calc_lane_vertices(right_points, 100, image.shape[0])
         rightDegree = math.atan2(right_vtx[1][0]-right_vtx[0][0], right_vtx[1][1] - right_vtx[0][1]) * 180 / 3.14
         cv2.line(image, right_vtx[0], right_vtx[1], (255,0,0), 10)
+        rx = right_vtx[1][0]
     except :
         status = status + "right"
+        rx = 0
         # return image, "rc -10 0 0 0", status
     if status == "left":
         if rightDegree < 33:
@@ -210,7 +214,6 @@ def imageDegreeCheck(image, mode):
             status = "left"
             result = "rc -10 0 0 0"
         return image, result, status
-
     elif status == "right":
         if leftDegree > -5:
             if leftDegree > 30:
@@ -229,6 +232,7 @@ def imageDegreeCheck(image, mode):
         return image, result, status
     
     elif status == "leftright":
+        result = "rc 0 22 0 0"
         return image, result, status
 
     
@@ -313,20 +317,20 @@ def imageDegreeCheck(image, mode):
 # cv2.waitKey(0)
 #TODO: how to calc the total? 
 
-cap = cv2.VideoCapture('outputqw.avi')
+# cap = cv2.VideoCapture('outputqw.avi')
+# lx = 0
+# rx = 0
+# while(cap.isOpened()):
+#     cap.set(cv2.CAP_PROP_FPS, 10)
+#     ret, frame = cap.read()
+#     im, result,status = imageDegreeCheck(frame, 'go')
 
-while(cap.isOpened()):
-    cap.set(cv2.CAP_PROP_FPS, 10)
-    ret, frame = cap.read()
-    im, result,status = imageDegreeCheck(frame, 'go')
-    print(status, result)
-    
-    cv2.imshow('frame',im   )
-    key = cv2.waitKey(20)
-    if cv2.waitKey(20) & 0xFF == ord('q'):
-        break
-    if key == ord('p'):
-        cv2.waitKey(-1)
+#     cv2.imshow('frame',im   )
+#     key = cv2.waitKey(20)
+#     if cv2.waitKey(20) & 0xFF == ord('q'):
+#         break
+#     if key == ord('p'):
+#         cv2.waitKey(-1)
 
-cap.release()
-cv2.destroyAllWindows()
+# cap.release()
+# cv2.destroyAllWindows()
