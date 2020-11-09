@@ -10,8 +10,9 @@ import string
 import face_recognition
 import datetime
 import threading, queue
-
-
+import time
+import asyncio
+from image_uploader.image_uploader import upload as u
 from std_msgs.msg import String
 import sensor_msgs.msg as msg
 from rclpy.node import Node
@@ -25,12 +26,37 @@ from fix import check
 from aruco import aru
 from degree_new_test import imageDegreeCheck
 from pprint import pprint
+import uuid
 # print('aaa')
-
+frame_queue = queue.Queue()
+face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+frame_save_count = 0
+upload_lock = False
 # Initialize some variables
+def face_detect():
+    global frame_queue
+    global face_cascade
+    if not frame_queue.empty():
+        frame = frame_queue.get()
+            # TODO: get something face detcet stuff into here.
+                        
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+        if len(faces) == 0:
+            return
+        else:
+            fname = "save/" + str(uuid.uuid4().hex) + ".png"
+            cv2.imwrite(fname, frame)
+            upload(fname)
+
+def upload(img_path):
+    global upload_lock
+    if not upload_lock:
+        upload_lock = True
+        u(img_path)
+        upload_lock = False
 
 # Create arrays of known face encodings and their name
-
 class MinimalSubscriber(Node):
 
     def __init__(self):
@@ -65,7 +91,7 @@ class MinimalSubscriber(Node):
         self.telloCli = self.create_client(TelloAction, 'tello_action') #TODO: 待完成，call ros2 service
         self.telloCliRequest = TelloAction.Request()
         self.cwQueue = queue.Queue()
-        if self.telloCli.wait_for_service:
+        if self.telloCli.wait_for_service():
             self.sendRequest("rc 0 0 0 0")
         self.bridge = CvBridge() # CvBridge Init
         self.process_this_frame = True # ! 用來一次只處理一個 frame 的 variable
@@ -74,6 +100,7 @@ class MinimalSubscriber(Node):
         self.noFaceCount = 0
         self.yaw = 0
         self.inityaw = 0
+        self.frame_count = 0
         self.realyaw = 0
         self.yawWrite = True
         self.nameTest = 0
@@ -86,7 +113,7 @@ class MinimalSubscriber(Node):
         self.CY = 360   # 大約在畫面中間的 Y 座標
         self.xulyframe = 0
         self.future = 0
-        self.cwCount = 0
+        self.cwCount = 10
         self.successconb = False
         self.action_future = False
         self.face_locations = [] # 存解析輸入圖片後人臉的位置
@@ -149,7 +176,7 @@ class MinimalSubscriber(Node):
         self.future = self.sendRequest('rc 0 0 0 0')
 
     def userCommandCallBack(self, s):
-        print(s.data)
+        # print(s.data)
         if s.data == 'stop':
             self.stop = True 
             print("system stop", self.stop)
@@ -208,6 +235,7 @@ class MinimalSubscriber(Node):
     def heightCallback(self, data):
         self.battery = str(data.bat)
         self.yaw = str(data.yaw)
+        # print(data)
         if self.yawWrite:
             self.yaw = data.yaw
 
@@ -225,23 +253,22 @@ class MinimalSubscriber(Node):
             self.heightHighLock = False
 
     def responseCallBack(self,data):
-        print(self.cwQueue.qsize())
-        try:
-            self.battery = int(data.str)
-            self.battery = str(self.battery)
-        except:
-            pass
+        print("CwQueue",self.cwQueue.queue)
         if 'error' in data.str:
             print(self.cwQueue.empty(), self.cwQueue.qsize())
             if self.cwQueue.empty():
                 return
-            instruction = self.cwQueue.get()
+            try:
+                instruction = self.cwQueue.queue[0]
             # if instruction == "cw 3" or instruction == "cw -3":
             #     print("30 yet",instruction)
             #     if self.cwCount > 10:
             #         return
-            self.cwQueue.put(instruction)
-            self.sendRequest(instruction)
+                self.cwQueue.put(instruction)
+                self.cwQueue.get()
+                self.sendRequest(instruction)
+            except:
+                pass
             # self.cwSwitch = True
         else:
             if self.cwQueue.empty():
@@ -259,7 +286,13 @@ class MinimalSubscriber(Node):
         except CvBridgeError as e:
             print(e)
         small_frame = cv2.resize(cv_image, (0, 0), fx=0.5, fy=0.5) # resize frame
-        
+        if self.frame_count % 30 == 0:
+            frame_queue.put(small_frame)
+            fd = threading.Thread(target=face_detect)
+            fd.start()
+        else:
+            self.frame_count = self.frame_count + 1
+        # print(self.future._result)
         if self.landautien:
             self.landautien = False
             # self.action_future = True
@@ -299,7 +332,9 @@ class MinimalSubscriber(Node):
         if self.heightHighLock:
             self.sendRequest("rc 0 0 -10 0")
             return
+
         if not self.cwQueue.empty():
+            # self.sendRequest("rc 0 0 0 0")
             return
         if self.futureInstruction != "":
             print(self.futureInstruction)
@@ -307,17 +342,26 @@ class MinimalSubscriber(Node):
             self.sendRequest(self.futureInstruction)
             self.futureInstruction = ""
             return
-        _, r, s = imageDegreeCheck(cv_image, self.aruGoMode)
+        _, _, distanceToCenter = imageDegreeCheck(cv_image, False)
         try:
             if "cw" in r:
                 print("cw", r)
         except:
             pass
         if self.action_future:
+            self.combError = self.combError + 1
+            if self.combError > 20:
+                self.action_future = False
+                self.successconb = False
+                self.combError = 0
+                if self.aruTarget in self.aruFar:
+                    print("far target")
+                    self.aruBeLock("forward", True)
+                return
             self.successconb = False
             if not self.successconb:
                 # if self.aruGoMode == "go": 
-                _, result_edge, status = imageDegreeCheck(cv_image, self.aruGoMode)
+                _, result_edge, status = imageDegreeCheck(cv_image, True)
                 print(status, self.noLineStatus, self.noLineInstruction)
                 if status != "":
                     if status == "lefttoomuch":
@@ -391,21 +435,25 @@ class MinimalSubscriber(Node):
                         if self.aruTarget in self.aruFar:
                             print("far target")
                             self.aruBeLock("forward", True)
+                        return
                     else:
                         if "cw" in result_edge:
                             print("self.cwCount", self.cwCount)
-                            if self.cwCount > 10:
+                            if self.cwCount < 10:
+                                self.cwCount = self.cwCount + 1
+                                print(self.cwCount)
+                                self.sendRequest("rc 0 0 0 0")
+                                self.action_future = False
+                                return
+                            if self.cwCount >= 10:
                                 print("cwed")
+                                self.sendRequest("rc 0 0 0 0", False)
                                 self.cwCount = 0
                                 # self.cwSwitch = True
                                 self.cwQueue.put(result_edge)
                                 self.future = self.sendRequest(result_edge, False)
                                 return
-                            else:
-                                self.cwCount = self.cwCount + 1
-                                print(self.cwCount)
-                                self.sendRequest("rc 0 0 0 0")
-                                return
+                                
                         self.future = self.sendRequest(result_edge, False)
                         # self.keep = False
                         # self.action_future = False
@@ -415,47 +463,37 @@ class MinimalSubscriber(Node):
                         #     self.aruBeLock("forward", True)
                         return
                     # print(result_edge)
-        # print(self.combError)
-        # if r != "cw 0" or r != "":
-        #     self.combError = self.combError + 1
-        # if self.combError > 10:
-        #     self.action_future = True
-        if s != "":
-            try:
-                save = s.split(' ')
-                # # print(save)
-                # if save[0] == "lefttoomuch" or save[0] == "righttoomuch":
-                #     if int(save[1]) > 100:
-                #         if save[0] == "lefttoomuch":
-                #             self.sendRequest("cw 3")
-                #             self.cwQueue.put("cw 3")
-                #             return
-                #         elif save[0] == "righttoomuch":
-                #             self.sendRequest("cw -3")
-                #             self.cwQueue.put("cw -3")
-                #             return
-            except:
-                pass
-        if self.landautien:
-            self.action_future = True
-        #     self.cwQueue.put("battery?")
-        #     self.sendRequest("battery?")
-        #     self.landautien = False600
-
-        
-        # if self.cwSwitch:
-        #     self.action_future = True
-        #     return
-        
+        if self.aruTarget in self.aruFar:
+                    print("far target")
+                    self.aruBeLock("forward", True)
+        distanceToCenterFix = 0
+        try:
+            distanceToCenter = int(distanceToCenter)
+            if distanceToCenter > 30:
+                distanceToCenterFix = 10
+            elif distanceToCenter < -30:
+                distanceToCenterFix = -10
+            # print(distanceToCenter, "distnaceToCenter")
+        except Exception as e:
+            # print(distanceToCenter, "distanceToCenter error")
+            # print(e)
+            pass
+            
 
         if self.aruLock:
             if self.aruLockCode == 'back':
                 self.sendRequest('rc 0 -10 0 0')
             elif self.aruLockCode == 'forward':
                 if len(aru_id) == 0:
-                    self.sendRequest('rc 0 25 -3 0')
+                    # print(distanceToCenter, "distnaceToCenter")
+                    request = "rc "+str(distanceToCenterFix)+" 25 -3 0"
+                    print(request, "request")
+                    self.sendRequest(request)
                 else:
-                    self.sendRequest('rc 0 22 -3 0')
+                    # print(distanceToCenter, "distnaceToCenter")
+                    request = "rc "+str(distanceToCenterFix)+" 22 -3 0"
+                    print(request, "request")                    
+                    self.sendRequest(request)
 
         if len(aru_id) != 0:
             _aru_id = np.array(aru_id).flatten()
@@ -528,8 +566,10 @@ class MinimalSubscriber(Node):
                         self.aruBeLock('', False)
                 elif ids[0] not in self.aruFar:
                     self.aruBeLock('', False)
-                if (ids[0] == 2 and self.aruTarget == 2) or (ids[0] == 6 and self.aruTarget == 6):
+                if ids[0] == 2 and self.aruTarget == 2:
                     self.aruBound = [130,400]
+                elif ids[0] == 6 and self.aruTarget == 6:
+                    self.aruBound = [300,400]
                 elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'go':
                     self.aruBound = [120,130]
                 elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'back':
@@ -1047,12 +1087,14 @@ class MinimalSubscriber(Node):
         return output
 
 def main(args=None):
+
+
+
     rclpy.init(args=args)
 
     minimal_subscriber = MinimalSubscriber()
 
     rclpy.spin(minimal_subscriber)
-
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
     # when the garbage collector destroys the node object)

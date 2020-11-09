@@ -266,8 +266,12 @@ def imageDegreeCheck(image, mode):
                 status = "notrealright"
                 result = "rc -10 0 0 0"
         else:
-            status  = "right"
-            result = "rc 10 0 0 0"
+            if leftDegree <= -10:
+                status = "notrealright"
+                result = "rc -10 0 0 0"
+            else:
+                status  = "right"
+                result = "rc 10 0 0 0"
         return image, result, status
     
     elif status == "leftright":
@@ -301,26 +305,36 @@ def imageDegreeCheck(image, mode):
     top = int(image.shape[0] * 0.6)
     realTop = image.shape[0] - top
     left_bottom = line_center - left_vtx[1][0]
-    left_top = line_center - left_fun(top)
+    left_top = line_center_top - left_fun(top)
     right_bottom = right_vtx[1][0] - line_center
-    right_top = right_fun(top) - line_center
+    right_top = right_fun(top) - line_center_top
     left_total = ((left_bottom + left_top) * realTop) / 2
     right_total = ((right_bottom + right_top) * realTop) / 2
-    mean= (left_total+right_total) / 2
-    left_mean = left_total/mean*100
-    right_mean = right_total/mean*100
+    mean= left_total+right_total
+    left_mean = (left_total/mean)*100
+    right_mean = (right_total/mean)*100
     distanceToCenter = line_center - center
-    # cv2.line(image, (line_center, 0), (line_center_top, image.shape[1]), (0, 0, 255), 5)
+    if not mode:
+        return image, result, distanceToCenter
+
     cv2.line(image, (line_center, image.shape[1]), (line_center_top, 100), (0, 0, 255), 5)
+    # cv2.line(image, (line_center_top, image.shape[1]), (right_fun(top), image.shape[1]), (0, 0, 255), 5)
+    # cv2.line(image, (left_vtx[1][0], image.shape[1]), (left_fun(top), image.shape[1]), (0, 0, 255), 5)
+
     centerDegree = int(math.atan2(line_center_top-line_center, 100) * 180 / 3.14)
     try:
-        center_slope = (100 - image.shape[1])/(line_center_top-line_center)
+        center_range = abs(line_center-line_center_top)
+        if center_range >= 5:
+            center_slope = (image.shape[1] - 100)/(line_center-line_center_top)
+        else:
+            center_slope = 0
     except:
-        center_slope = 100 - image.shape[1]
+        center_slope = 0
     print("center degree", centerDegree)
     cv2.line(image, (center, 0), (center, image.shape[0]), (0, 0, 0), 5)
-
-    if lr_slope <= 1 and lr_slope >= -1:
+    if distanceToCenter <= 10 and distanceToCenter >= -10:
+        print(distanceToCenter)
+    if lr_slope <= 1 and lr_slope >= -1 and (distanceToCenter <= 7 and distanceToCenter >= -7):
         pass
     elif center < line_center:
         # distanceToCenter = abs(distanceToCenter)
@@ -330,12 +344,12 @@ def imageDegreeCheck(image, mode):
             return image, result, status
     elif center > line_center:
         # distanceToCenter = abs(distanceToCenter)
-        if distanceToCenter <= 7:
+        if distanceToCenter <= 7 and distanceToCenter > 1:
             status = "righttoomuch " +str(distanceToCenter) 
             result = "rc -10 0 0 0"
             return image, result, status
     else:
-        if distanceToCenter < 30:
+        if distanceToCenter > 30:
             result = "rc 10 0 0 0"
             return image, result, status
         elif distanceToCenter < -30:
@@ -347,44 +361,54 @@ def imageDegreeCheck(image, mode):
 
     if left_mean > right_mean:
         _centerDegree = abs(centerDegree)
-        dx = left_mean-right_mean
+        dx = left_mean/right_mean
         print(centerDegree)
-        if dx > 20:
-            if distanceToCenter <= 0 or centerDegree <= 0:
+        if dx > 1.4:
+            if center_slope > 0:
                 result = "cw -3"
             else:
                 result = "cw 3"
         else:
-            if distanceToCenter < -15:
+            if center_slope > 0:
                 result = "cw -3"
-            elif distanceToCenter > 15:
+            elif center_slope < 0:
                 result = "cw 3"
             else:
-                result = "cw 0"
+                if distanceToCenter <= 7 and distanceToCenter >= -7:
+                    result = "cw 0"
+                elif distanceToCenter > 7:
+                    result = "cw 3"
+                elif distanceToCenter < -7:
+                    result = "cw -3"
             # print("cw 0")
             
 
     else:
         _centerDegree = abs(centerDegree)
 
-        dx = right_mean-left_mean
+        dx = right_mean/left_mean
 
-        if dx > 20:
-            if distanceToCenter <= 0:
+        if dx > 1.4:
+            if center_slope > 0:
                 result = "cw -3"
-            else:
+            elif center_slope < 0:
                 result = "cw 3"
              
         # elif dx > 15 and mode == "go":
         #     result = "cw "+str(centerDegree)
         #     print(result)
         else:
-            if distanceToCenter < -15:
+            if center_slope > 0:
                 result = "cw -3"
-            elif distanceToCenter > 15:
+            elif center_slope < 0:
                 result = "cw 3"
             else:
-                result = "cw 0"
+                if distanceToCenter <= 7 and distanceToCenter >= -7:
+                    result = "cw 0"
+                elif distanceToCenter > 7:
+                    result = "cw 3"
+                elif distanceToCenter < -7:
+                    result = "cw -3"
     
     return image, result, status
 # im = cv2.imread("test5.png")
@@ -398,7 +422,7 @@ def imageDegreeCheck(image, mode):
 # cv2.waitKey(0)
 #TODO: how to calc the total? 
 
-# cap = cv2.VideoCapture('outputqw.avi')
+# cap = cv2.VideoCapture('output.avi')
 # lx = 0
 # rx = 0
 # while(cap.isOpened()):
