@@ -45,7 +45,12 @@ def face_detect():
         if len(faces) == 0:
             return
         else:
-            fname = "save/" + str(uuid.uuid4().hex) + ".png"
+            for (x,y,w,h) in faces:
+                face = frame[int(y):int(y+h), int(x):int(x+w)]
+                crop = "crop/" + str(uuid.uuid4().hex) + ".jpg"
+                cv2.imwrite(crop, face)
+            
+            fname = "save/" + str(uuid.uuid4().hex) + ".jpg"
             cv2.imwrite(fname, frame)
             upload(fname)
 
@@ -174,7 +179,12 @@ class MinimalSubscriber(Node):
                 print("removed dataset_img/%s.jpg"%item)
 
         self.future = self.sendRequest('rc 0 0 0 0')
-
+    def getDegreeActually(self):
+        if self.aruGoMode == "go":
+            base = 180
+        else:
+            base = 0
+        return self.yaw - base
     def userCommandCallBack(self, s):
         # print(s.data)
         if s.data == 'stop':
@@ -569,7 +579,7 @@ class MinimalSubscriber(Node):
                 if ids[0] == 2 and self.aruTarget == 2:
                     self.aruBound = [130,400]
                 elif ids[0] == 6 and self.aruTarget == 6:
-                    self.aruBound = [300,400]
+                    self.aruBound = [200,300]
                 elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'go':
                     self.aruBound = [120,130]
                 elif ids[0] == 3 and self.aruTarget == 3 and self.aruGoMode == 'back':
@@ -817,9 +827,12 @@ class MinimalSubscriber(Node):
                             self.aruTarget = 2
                             self.aruTempTarget = 2
                             self.action_processing = True
-                            self.cwQueue.put("cw 180")
-                            self.future = self.sendRequest("cw 180", False)
+                            self.cwQueue.put("cw -40")
+                            self.future = self.sendRequest("cw -40", False)
+                            self.futureInstruction = "cw -140"
+                            
                             self.action_future = True
+                            self.aruBeLock("forward", True)
                             self.combArray.clear()
 
                             self.aruGoMode = 'go'
@@ -1087,8 +1100,6 @@ class MinimalSubscriber(Node):
         return output
 
 def main(args=None):
-
-
 
     rclpy.init(args=args)
 
