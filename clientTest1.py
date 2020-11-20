@@ -10,7 +10,7 @@ from tello_msgs.srv import TelloAction
 from rclpy.node import Node
 from std_msgs.msg import String
 
-SERVERIP = 'http://35.201.162.120:5000'    # local host, just for testing
+SERVERIP = 'https://xiang.shirinmi.io:48763'    # local host, just for testing
 
 
 class Publisher(Node):
@@ -44,7 +44,7 @@ class Publisher(Node):
             else:
                 result.append(i[0])
         resultJson = '_'.join(result)
-        r = requests.get(SERVERIP + "/set_face?facename=" + resultJson)
+        r = requests.get(url=SERVERIP + "/set_face?facename=" + resultJson, verify=False)
           
     def setFaceName(self, name):
         n = String()
@@ -53,7 +53,7 @@ class Publisher(Node):
 def getArg(pub):
     while True:
     
-        r = requests.get(SERVERIP + "/update_data")
+        r = requests.get(url=SERVERIP + "/update_data", verify=False)
         try:
             data = r.json()
             if data['instruction'] == 'takeoff':

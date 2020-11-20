@@ -49,7 +49,6 @@ def face_detect():
                 face = frame[int(y):int(y+h), int(x):int(x+w)]
                 crop = "crop/" + str(uuid.uuid4().hex) + ".jpg"
                 cv2.imwrite(crop, face)
-            
             fname = "save/" + str(uuid.uuid4().hex) + ".jpg"
             cv2.imwrite(fname, frame)
             upload(fname)
@@ -324,9 +323,21 @@ class MinimalSubscriber(Node):
         #     self.batteryCount = 0
         # else:
         #     self.batteryCount = self.batteryCount + 1
-        batteryStr = "battery: " + self.battery
-        yawStr = "yaw: " + str(self.yaw)
-        statusText = batteryStr + yawStr
+        batteryStr = "battery: " + self.battery + " "
+        yawStr = "yaw: " + str(self.yaw) + " "
+        phaseStr = "phase:" + self.aruGoMode + " "
+        errorDegree = 0
+        # if go degree = 177~180 / -177~-180
+        # if back degree = 0~3 / 0~-3
+        if self.aruGoMode == "back":
+            if self.yaw < 0:
+                errorDegree = -180 - self.yaw
+            else:
+                errorDegree = 180 - self.yaw
+        if self.aruGoMode == "go":
+                errorDegree = self.yaw
+        errorDegreeStr = "Error: " + str(errorDegree)
+        statusText = batteryStr + yawStr + errorDegreeStr
         cv2.putText(small_frame, statusText, (0,20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
 
         cv2.startWindowThread()
