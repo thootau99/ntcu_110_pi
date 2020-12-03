@@ -119,12 +119,11 @@ def imageDegreeCheck(image, mode):
 
     for line in lines:
         for x1,y1,x2,y2 in line:
-            cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
+            # cv2.line(line_image,(x1,y1),(x2,y2),(255,0,0),10)
             # if x2==x1:
             #     continue # ignore a vertical line
             slope = (y2-y1)/(x2-x1)
             intercept = y1 - slope*x1
-            cv2.putText(line_image, str(slope), (x1, y1-20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1, cv2.LINE_AA, False)
 
             if slope < 0: # y is reversed in image
                 left_lines.append(line)
@@ -222,7 +221,7 @@ def imageDegreeCheck(image, mode):
     status = ""
     result  = ""
     try:
-        left_vtx, left_fun = calc_lane_vertices(left_points, 100, image.shape[0])
+        left_vtx, left_fun = calc_lane_vertices(left_points, 300, image.shape[0])
         leftDegree = math.atan2(left_vtx[1][0]-left_vtx[0][0], left_vtx[1][1] - left_vtx[0][1]) * 180 / 3.14
         left_slope = (left_vtx[1][1]-left_vtx[0][1])/(left_vtx[1][0]-left_vtx[0][0])
         cv2.line(image, left_vtx[0], left_vtx[1], (255,0,0), 10)
@@ -232,7 +231,7 @@ def imageDegreeCheck(image, mode):
         status = "left"
         lx = 0
     try:
-        right_vtx, right_fun = calc_lane_vertices(right_points, 100, image.shape[0])
+        right_vtx, right_fun = calc_lane_vertices(right_points, 300, image.shape[0])
         rightDegree = math.atan2(right_vtx[1][0]-right_vtx[0][0], right_vtx[1][1] - right_vtx[0][1]) * 180 / 3.14
         right_slope = (right_vtx[1][1]-right_vtx[0][1])/(right_vtx[1][0]-right_vtx[0][0])
         cv2.line(image, right_vtx[0], right_vtx[1], (255,0,0), 10)

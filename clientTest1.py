@@ -5,13 +5,55 @@ import rclpy
 import threading
 import json
 from tello_msgs.srv import TelloAction
-
-
+from threading import BoundedSemaphore
+from concurrent.futures import ThreadPoolExecutor
+sem = threading.Semaphore()
+import requests.packages.urllib3
+requests.packages.urllib3.disable_warnings()
 from rclpy.node import Node
 from std_msgs.msg import String
 
-SERVERIP = 'https://xiang.shirinmi.io:48763'    # local host, just for testing
+SERVERIP = 'https://xiang.shirinmi.io'    # local host, just for testing 
+class BoundedExecutor:
+    """BoundedExecutor behaves as a ThreadPoolExecutor which will block on
+    calls to submit() once the limit given as "bound" work items are queued for
+    execution.
+    :param bound: Integer - the maximum number of items in the work queue
+    :param max_workers: Integer - the size of the thread pool
+    """
+    def __init__(self, bound, max_workers):
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
+        self.semaphore = BoundedSemaphore(bound + max_workers)
 
+    """See concurrent.futures.Executor#submit"""
+    def submit(self, fn, *args, **kwargs):
+        self.semaphore.acquire()
+        try:
+            future = self.executor.submit(fn, *args, **kwargs)
+        except:
+            self.semaphore.release()
+            raise
+        else:
+            future.add_done_callback(lambda x: self.semaphore.release())
+            return future
+
+    """See concurrent.futures.Executor#shutdown"""
+    def shutdown(self, wait=True):
+        self.executor.shutdown(wait)
+
+def countdown(t, pub): 
+    while t: 
+        mins, secs = divmod(t, 60) 
+        timer = '{:02d}:{:02d}'.format(mins, secs) 
+        print(timer, end="\r") 
+        time.sleep(1) 
+        t -= 1
+    pub.sendToTello("takeoff")
+    print('count complete.')
+    return True
+  
+  
+exe = BoundedExecutor(4, 100)
 
 class Publisher(Node):
 
@@ -73,9 +115,10 @@ def getArg(pub):
             if data['instruction'] == 'start':
                 print('start')
                 pub.setFaceName('start')
-            if data['instruction'] == 'mask':
-                print('mask')
-                pub.setFaceName('mask')
+            if data['instruction'] == 'timer':
+                print('timer', data['min'])
+                m = int(data['min']) * 5
+                exe.submit(countdown, m, pub)
             if data['instruction'] == 'normal':
                 print('normal')
                 pub.setFaceName('normal')

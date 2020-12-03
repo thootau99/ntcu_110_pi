@@ -9,7 +9,6 @@ dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 parameters = aruco.DetectorParameters_create()
 
 parameters.cornerRefinementMethod = aruco.CORNER_REFINE_CONTOUR
-
 cc = cv2.VideoWriter_fourcc(*'XVID')
 out = cv2.VideoWriter('output.avi', cc, 20.0, (480, 360))
 
@@ -77,7 +76,6 @@ def aru(frame):
                 draw_pole_length = marker_length/2 # 現実での長さ[m]
                 aruco.drawAxis(frame, camera_matrix, distortion_coeff, rvec, tvec, draw_pole_length)
                 
-
         out.write(frame)
         cnt+=1
 
