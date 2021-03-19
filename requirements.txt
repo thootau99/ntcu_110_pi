@@ -38,7 +38,7 @@ numpy==1.18.4
 object-detection==0.1
 opencv-python==4.2.0.34
 osrf-pycommon==0.1.9
-Pillow==7.1.2
+Pillow==8.1.1
 pyparsing==2.4.7
 python-dateutil==2.8.1
 quality-of-service-demo-py==0.7.9
