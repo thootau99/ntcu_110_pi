@@ -34,7 +34,7 @@ launch-ros==0.8.7
 launch-testing==0.8.7
 launch-testing-ros==0.8.7
 matplotlib==3.2.1
-numpy==1.18.4
+numpy==1.22.0
 object-detection==0.1
 opencv-python==4.2.0.34
 osrf-pycommon==0.1.9
